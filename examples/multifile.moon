@@ -1,0 +1,12 @@
+# procs and vars from test_while.moon should still be in scope
+hello ("multi-file world")
+print "sum_range(1,10) = " sum_range(1, 10)
+
+
+proc test_after_return (x) {
+    print "number is " x
+    return
+    print "here?"
+}
+
+print test_after_return (40)

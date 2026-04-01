@@ -1,0 +1,61 @@
+# cmake_uninstall.cmake.in
+#
+
+message(STATUS "Starting Moon uninstall...")
+
+# ------------------------------------------------------------------------------
+# 1. Remove installed files (standard CMake uninstall)
+# ------------------------------------------------------------------------------
+
+set(MANIFEST "@CMAKE_CURRENT_BINARY_DIR@/install_manifest.txt")
+
+if(NOT EXISTS "${MANIFEST}")
+    message(FATAL_ERROR "Cannot find install_manifest.txt. Have you run 'make install'?")
+endif()
+
+file(READ "${MANIFEST}" files)
+string(REGEX REPLACE "\n" ";" files "${files}")
+
+foreach(file ${files})
+    if(EXISTS "${file}" OR IS_SYMLINK "${file}")
+        message(STATUS "Removing installed file: ${file}")
+        file(REMOVE "${file}")
+    else()
+        message(STATUS "Already removed or missing: ${file}")
+    endif()
+endforeach()
+
+# ------------------------------------------------------------------------------
+# 2. Remove ~/.moon directory
+# ------------------------------------------------------------------------------
+
+if(DEFINED ENV{HOME})
+    set(MOON_HOME "$ENV{HOME}/.moon")
+    if(EXISTS "${MOON_HOME}")
+        message(STATUS "Removing directory: ${MOON_HOME}")
+        file(REMOVE_RECURSE "${MOON_HOME}")
+    else()
+        message(STATUS "~/.moon directory not present")
+    endif()
+endif()
+
+
+# ------------------------------------------------------------------------------
+# 3. Cleanup for Linux / Windows (optional)
+#    Remove ${CMAKE_INSTALL_PREFIX}/moon or ${CMAKE_INSTALL_PREFIX}/bin/moon
+# ------------------------------------------------------------------------------
+
+set(PREFIX "@CMAKE_INSTALL_PREFIX@")
+
+if(EXISTS "${PREFIX}/moon")
+    message(STATUS "Removing: ${PREFIX}/moon")
+    file(REMOVE_RECURSE "${PREFIX}/moon")
+endif()
+
+if(EXISTS "${PREFIX}/bin/moon")
+    message(STATUS "Removing CLI binary directory: ${PREFIX}/bin/moon")
+    # No REMOVE_RECURSE because it may contain other binaries
+    file(REMOVE "${PREFIX}/bin/moon")
+endif()
+
+message(STATUS "Moon uninstall completed.")
