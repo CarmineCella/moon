@@ -21,8 +21,8 @@ proc pvoc(sig, stretch, semitones, N, hop) {
 
     var spec0    = specs[0]
     var magphi0  = deinterleave(car2pol(spec0))
-    var amps0    = magphi0[0]
-    var phi0_in  = magphi0[1]
+    var amps0    = head(magphi0)
+    var phi0_in  = tail(magphi0)
     var phi0_out = phi0_in
 
     push(out_specs, pol2car(interleave([amps0, phi0_out])))
@@ -33,8 +33,8 @@ proc pvoc(sig, stretch, semitones, N, hop) {
     var f = 1
     while (f < nframes) {
         var mp     = deinterleave(car2pol(specs[f]))
-        var amps   = mp[0]
-        var phi_in = mp[1]
+        var amps   = head(mp)
+        var phi_in = tail(mp)
 
         var delta      = phi_in - prev_phi_in
         var expected   = omega * Ha

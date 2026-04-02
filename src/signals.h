@@ -1,11 +1,3 @@
-// signals.h
-//
-// Signals / DSP library for Musil v0.5
-//
-// All operations on numeric vectors (NumVal = std::valarray<double>).
-// Include this file and call add_signals(env) to register all builtins.
-// Sub-headers FFT.h and features.h are pure C++ — no changes needed.
-
 #ifndef SIGNALS_H
 #define SIGNALS_H
 
@@ -34,7 +26,49 @@ static const NumVal& sig_nvec(const Value& v, const std::string& fn) {
     return std::get<NumVal>(v);
 }
 
-// ── C++ support functions (unchanged from original) ───────────────────────────
+// Packed pair helpers: represent two equal-length vectors as one NumVal
+// [a0 a1 ... aN-1  b0 b1 ... bN-1]
+static std::size_t packed_half_size(const NumVal& v, const std::string& fn) {
+    if (v.size() % 2 != 0)
+        throw Error{"signals", -1, fn + ": packed vector length must be even"};
+    return v.size() / 2;
+}
+
+static NumVal pack_pair(const NumVal& a, const NumVal& b, const std::string& fn) {
+    if (a.size() != b.size())
+        throw Error{"signals", -1, fn + ": both vectors must have the same length"};
+    std::valarray<Real> out(Real(0), a.size() + b.size());
+    for (std::size_t i = 0; i < a.size(); ++i) out[i] = a[i];
+    for (std::size_t i = 0; i < b.size(); ++i) out[a.size() + i] = b[i];
+    return NumVal(out);
+}
+
+static NumVal packed_first(const NumVal& v, const std::string& fn) {
+    std::size_t N = packed_half_size(v, fn);
+    std::valarray<Real> out(Real(0), N);
+    for (std::size_t i = 0; i < N; ++i) out[i] = v[i];
+    return NumVal(out);
+}
+
+static NumVal packed_second(const NumVal& v, const std::string& fn) {
+    std::size_t N = packed_half_size(v, fn);
+    std::valarray<Real> out(Real(0), N);
+    for (std::size_t i = 0; i < N; ++i) out[i] = v[N + i];
+    return NumVal(out);
+}
+
+// Extract b/a from packed filtdesign coefficients [b0 b1 b2 1 a1 a2]
+static void unpack_biquad_coeffs(const NumVal& coeffs, std::valarray<Real>& b, std::valarray<Real>& a,
+                                 const std::string& fn) {
+    if (coeffs.size() != 6)
+        throw Error{"signals", -1, fn + ": packed coeffs must have length 6 [b0 b1 b2 1 a1 a2]"};
+    b.resize(3);
+    a.resize(3);
+    b[0] = coeffs[0]; b[1] = coeffs[1]; b[2] = coeffs[2];
+    a[0] = coeffs[3]; a[1] = coeffs[4]; a[2] = coeffs[5];
+}
+
+// ── C++ support functions (unchanged from original) ──────────────────────────
 
 static void gen10(const std::valarray<Real>& coeff, std::valarray<Real>& values) {
     Real norm = 0;
@@ -46,7 +80,7 @@ static void gen10(const std::valarray<Real>& coeff, std::valarray<Real>& values)
             acc += coeff[j] * sin(2.0 * M_PI * (j + 1) * (Real)i / values.size());
         values[i] = acc / norm;
     }
-    values[values.size() - 1] = values[0]; // guard point
+    values[values.size() - 1] = values[0];
 }
 
 static int next_pow2(int n) {
@@ -56,8 +90,7 @@ static int next_pow2(int n) {
     return (1 << count);
 }
 
-static std::valarray<Real> conv_one_channel(
-    const std::valarray<Real>& x, const std::valarray<Real>& y) {
+static std::valarray<Real> conv_one_channel(const std::valarray<Real>& x, const std::valarray<Real>& y) {
     int x_sz = (int)x.size(), y_sz = (int)y.size();
     if (x_sz == 0 || y_sz == 0) return std::valarray<Real>();
     int conv_len = x_sz + y_sz - 1;
@@ -106,9 +139,6 @@ static std::valarray<Real> fd_resample(const std::valarray<Real>& x, Real factor
 }
 
 // ── Synthesis ─────────────────────────────────────────────────────────────────
-
-// mix(pos1, sig1, pos2, sig2, ...) -> NumVal
-// Mix signals at given sample offsets. Variadic: pairs of (offset, signal).
 static Value fn_mix(std::vector<Value>& args, Interpreter& I) {
     if (args.size() % 2 != 0)
         throw Error{I.filename, I.cur_line(), "mix: arguments must be (pos, sig) pairs"};
@@ -124,28 +154,22 @@ static Value fn_mix(std::vector<Value>& args, Interpreter& I) {
     return NumVal(out.data(), out.size());
 }
 
-// gen(len, c1, c2, ...) -> NumVal wavetable of length len+1 (guard point)
-// Generates a table using weighted sum of harmonics (gen10).
 static Value fn_gen(std::vector<Value>& args, Interpreter& I) {
     if (args.size() < 2)
         throw Error{I.filename, I.cur_line(), "gen: need len and at least one harmonic coefficient"};
     int len = (int)sig_scalar(args[0], "gen");
     if (len <= 0) throw Error{I.filename, I.cur_line(), "gen: length must be positive"};
     std::valarray<Real> coeffs(args.size() - 1);
-    for (std::size_t i = 1; i < args.size(); ++i)
-        coeffs[i-1] = sig_scalar(args[i], "gen");
+    for (std::size_t i = 1; i < args.size(); ++i) coeffs[i-1] = sig_scalar(args[i], "gen");
     std::valarray<Real> table(Real(0), len + 1);
     gen10(coeffs, table);
     return NumVal(table);
 }
 
-// osc(sr, freqs, table) -> NumVal signal
-// Table-lookup oscillator. freqs is a NumVal (one Hz value per sample).
-// table is a NumVal wavetable with guard point (len+1 samples).
 static Value fn_osc(std::vector<Value>& args, Interpreter& I) {
     if (args.size() != 3)
         throw Error{I.filename, I.cur_line(), "osc: 3 args required (sr, freqs, table)"};
-    Real sr          = sig_scalar(args[0], "osc");
+    Real sr = sig_scalar(args[0], "osc");
     const NumVal& freqs = sig_nvec(args[1], "osc");
     const NumVal& table = sig_nvec(args[2], "osc");
     int N = (int)table.size() - 1;
@@ -164,25 +188,17 @@ static Value fn_osc(std::vector<Value>& args, Interpreter& I) {
 }
 
 // ── Frequency domain ──────────────────────────────────────────────────────────
-
-// fft(sig) -> complex interleaved NumVal [r0, i0, r1, i1, ...]
-// Pads to next power of 2. Output length = 2 * next_pow2(len(sig)).
 static Value fn_fft(std::vector<Value>& args, Interpreter& I) {
     if (args.size() != 1)
         throw Error{I.filename, I.cur_line(), "fft: 1 argument required"};
     const NumVal& sig = sig_nvec(args[0], "fft");
     int d = (int)sig.size(), N = next_pow2(d);
     std::valarray<Real> buf(Real(0), 2 * N);
-    for (int i = 0; i < N; ++i) {
-        buf[2*i]   = (i < d ? sig[i] : Real(0));
-        buf[2*i+1] = Real(0);
-    }
+    for (int i = 0; i < N; ++i) { buf[2*i] = (i < d ? sig[i] : Real(0)); buf[2*i+1] = Real(0); }
     fft<Real>(&buf[0], N, -1);
     return NumVal(buf);
 }
 
-// ifft(spec) -> real NumVal of length N (complex interleaved input, length 2N)
-// Normalises by N (divides by frame size).
 static Value fn_ifft(std::vector<Value>& args, Interpreter& I) {
     if (args.size() != 1)
         throw Error{I.filename, I.cur_line(), "ifft: 1 argument required"};
@@ -197,16 +213,14 @@ static Value fn_ifft(std::vector<Value>& args, Interpreter& I) {
     return NumVal(out);
 }
 
-// car2pol(spec) -> in-place conversion: rectangular complex -> polar (amp, phase)
 static Value fn_car2pol(std::vector<Value>& args, Interpreter& I) {
     if (args.size() != 1)
         throw Error{I.filename, I.cur_line(), "car2pol: 1 argument required"};
-    NumVal spec = std::get<NumVal>(args[0]); // copy — value semantics
+    NumVal spec = std::get<NumVal>(args[0]);
     rect2pol(&spec[0], (int)spec.size() / 2);
     return spec;
 }
 
-// pol2car(spec) -> in-place conversion: polar -> rectangular complex
 static Value fn_pol2car(std::vector<Value>& args, Interpreter& I) {
     if (args.size() != 1)
         throw Error{I.filename, I.cur_line(), "pol2car: 1 argument required"};
@@ -215,162 +229,21 @@ static Value fn_pol2car(std::vector<Value>& args, Interpreter& I) {
     return spec;
 }
 
-// window(N, a0, a1, a2) -> NumVal of length N
-// Generalized cosine window. Common presets:
-//   Hann:     0.5  0.5  0.0
-//   Hamming:  0.54 0.46 0.0
-//   Blackman: 0.42 0.5  0.08
 static Value fn_window(std::vector<Value>& args, Interpreter& I) {
     if (args.size() != 4)
         throw Error{I.filename, I.cur_line(), "window: 4 args required (N, a0, a1, a2)"};
-    int N    = (int)sig_scalar(args[0], "window");
-    Real a0  = sig_scalar(args[1], "window");
-    Real a1  = sig_scalar(args[2], "window");
-    Real a2  = sig_scalar(args[3], "window");
+    int N = (int)sig_scalar(args[0], "window");
+    Real a0 = sig_scalar(args[1], "window");
+    Real a1 = sig_scalar(args[2], "window");
+    Real a2 = sig_scalar(args[3], "window");
     if (N <= 0) throw Error{I.filename, I.cur_line(), "window: N must be positive"};
     std::valarray<Real> win(N);
     make_window(&win[0], N, a0, a1, a2);
     return NumVal(win);
 }
 
-// ── Spectral features ─────────────────────────────────────────────────────────
-
-// speccent(amps, freqs) -> scalar spectral centroid
-static Value fn_speccent(std::vector<Value>& args, Interpreter& I) {
-    if (args.size() != 2)
-        throw Error{I.filename, I.cur_line(), "speccent: 2 args required (amps, freqs)"};
-    const NumVal& amps  = sig_nvec(args[0], "speccent");
-    const NumVal& freqs = sig_nvec(args[1], "speccent");
-    return NumVal{speccentr<Real>(&amps[0], &freqs[0], (int)amps.size())};
-}
-
-// specspread(amps, freqs, centroid) -> scalar spectral spread
-static Value fn_specspread(std::vector<Value>& args, Interpreter& I) {
-    if (args.size() != 3)
-        throw Error{I.filename, I.cur_line(), "specspread: 3 args required"};
-    const NumVal& amps  = sig_nvec(args[0], "specspread");
-    const NumVal& freqs = sig_nvec(args[1], "specspread");
-    Real centroid       = sig_scalar(args[2], "specspread");
-    return NumVal{specspread<Real>(&amps[0], &freqs[0], centroid, (int)amps.size())};
-}
-
-// specskew(amps, freqs, centroid, spread) -> scalar spectral skewness
-static Value fn_specskew(std::vector<Value>& args, Interpreter& I) {
-    if (args.size() != 4)
-        throw Error{I.filename, I.cur_line(), "specskew: 4 args required"};
-    const NumVal& amps  = sig_nvec(args[0], "specskew");
-    const NumVal& freqs = sig_nvec(args[1], "specskew");
-    Real centroid       = sig_scalar(args[2], "specskew");
-    Real spread         = sig_scalar(args[3], "specskew");
-    return NumVal{specskew<Real>(&amps[0], &freqs[0], centroid, spread, (int)amps.size())};
-}
-
-// speckurt(amps, freqs, centroid, spread) -> scalar spectral kurtosis
-static Value fn_speckurt(std::vector<Value>& args, Interpreter& I) {
-    if (args.size() != 4)
-        throw Error{I.filename, I.cur_line(), "speckurt: 4 args required"};
-    const NumVal& amps  = sig_nvec(args[0], "speckurt");
-    const NumVal& freqs = sig_nvec(args[1], "speckurt");
-    Real centroid       = sig_scalar(args[2], "speckurt");
-    Real spread         = sig_scalar(args[3], "speckurt");
-    return NumVal{speckurt<Real>(&amps[0], &freqs[0], centroid, spread, (int)amps.size())};
-}
-
-// specflux(amps, prev_amps) -> scalar spectral flux (half-wave rectified)
-static Value fn_specflux(std::vector<Value>& args, Interpreter& I) {
-    if (args.size() != 2)
-        throw Error{I.filename, I.cur_line(), "specflux: 2 args required (amps, prev_amps)"};
-    NumVal amps  = std::get<NumVal>(args[0]); // copy — specflux modifies prev
-    NumVal oamps = std::get<NumVal>(args[1]);
-    if (amps.size() != oamps.size())
-        throw Error{I.filename, I.cur_line(), "specflux: amps and prev_amps must be same length"};
-    return NumVal{specflux<Real>(&amps[0], &oamps[0], (int)amps.size())};
-}
-
-// specirr(amps) -> scalar spectral irregularity
-static Value fn_specirr(std::vector<Value>& args, Interpreter& I) {
-    if (args.size() != 1)
-        throw Error{I.filename, I.cur_line(), "specirr: 1 argument required"};
-    const NumVal& amps = sig_nvec(args[0], "specirr");
-    return NumVal{specirr<Real>(&const_cast<NumVal&>(amps)[0], (int)amps.size())};
-}
-
-// specdecr(amps) -> scalar spectral decrease
-static Value fn_specdecr(std::vector<Value>& args, Interpreter& I) {
-    if (args.size() != 1)
-        throw Error{I.filename, I.cur_line(), "specdecr: 1 argument required"};
-    const NumVal& amps = sig_nvec(args[0], "specdecr");
-    return NumVal{specdecr<Real>(&amps[0], (int)amps.size())};
-}
-
-// acorrf0(sig, sr) -> scalar f0 estimate via autocorrelation
-static Value fn_acorrf0(std::vector<Value>& args, Interpreter& I) {
-    if (args.size() != 2)
-        throw Error{I.filename, I.cur_line(), "acorrf0: 2 args required (sig, sr)"};
-    const NumVal& sig = sig_nvec(args[0], "acorrf0");
-    Real sr           = sig_scalar(args[1], "acorrf0");
-    std::valarray<Real> buff(sig.size());
-    return NumVal{acfF0Estimate<Real>(sr, &sig[0], &buff[0], (int)sig.size())};
-}
-
-// energy(sig) -> scalar RMS energy: sqrt(sum(x^2) / N)
-static Value fn_energy(std::vector<Value>& args, Interpreter& I) {
-    if (args.size() != 1)
-        throw Error{I.filename, I.cur_line(), "energy: 1 argument required"};
-    const NumVal& sig = sig_nvec(args[0], "energy");
-    return NumVal{energy<Real>(&sig[0], (int)sig.size())};
-}
-
-// zcr(sig) -> scalar zero-crossing rate in [0, 1]
-static Value fn_zcr(std::vector<Value>& args, Interpreter& I) {
-    if (args.size() != 1)
-        throw Error{I.filename, I.cur_line(), "zcr: 1 argument required"};
-    const NumVal& sig = sig_nvec(args[0], "zcr");
-    return NumVal{zcr<Real>(&sig[0], (int)sig.size())};
-}
-
-// ── Convolution ───────────────────────────────────────────────────────────────
-
-// conv(x, y) -> NumVal: linear (FFT-based) convolution
-static Value fn_conv(std::vector<Value>& args, Interpreter& I) {
-    if (args.size() != 2)
-        throw Error{I.filename, I.cur_line(), "conv: 2 arguments required"};
-    const NumVal& x = sig_nvec(args[0], "conv");
-    const NumVal& y = sig_nvec(args[1], "conv");
-    if (x.size() == 0 || y.size() == 0)
-        throw Error{I.filename, I.cur_line(), "conv: empty signal"};
-    return NumVal(conv_one_channel(std::valarray<Real>(x), std::valarray<Real>(y)));
-}
-
-// convmc(x_channels, y_channels) -> Array of NumVals
-// Multi-channel convolution. x_channels and y_channels are Arrays of NumVals.
-// The shorter list is extended by repeating its last element.
-static Value fn_convmc(std::vector<Value>& args, Interpreter& I) {
-    if (args.size() != 2)
-        throw Error{I.filename, I.cur_line(), "convmc: 2 arguments required"};
-    if (!std::holds_alternative<ArrayPtr>(args[0]) ||
-        !std::holds_alternative<ArrayPtr>(args[1]))
-        throw Error{I.filename, I.cur_line(), "convmc: arguments must be arrays of vectors"};
-    const auto& matx = std::get<ArrayPtr>(args[0])->elems;
-    const auto& maty = std::get<ArrayPtr>(args[1])->elems;
-    int nx = (int)matx.size(), ny = (int)maty.size();
-    if (nx == 0 || ny == 0)
-        throw Error{I.filename, I.cur_line(), "convmc: empty channel list"};
-    int max_ch = std::max(nx, ny);
-    auto out = std::make_shared<Array>();
-    for (int i = 0; i < max_ch; ++i) {
-        const NumVal& xch = sig_nvec(matx[i < nx ? i : nx-1], "convmc");
-        const NumVal& ych = sig_nvec(maty[i < ny ? i : ny-1], "convmc");
-        out->elems.push_back(NumVal(conv_one_channel(
-            std::valarray<Real>(xch), std::valarray<Real>(ych))));
-    }
-    return out;
-}
-
-// ── Interleave / deinterleave ─────────────────────────────────────────────────
-
-// deinterleave(sig) -> Array of 2 NumVals: [even_samples, odd_samples]
-// Splits interleaved stereo signal into two mono channels.
+// Packed helpers replacing ArrayPtr traffic while keeping builtin names
+// deinterleave(sig) -> packed NumVal [first_half, second_half]
 static Value fn_deinterleave(std::vector<Value>& args, Interpreter& I) {
     if (args.size() != 1)
         throw Error{I.filename, I.cur_line(), "deinterleave: 1 argument required"};
@@ -381,24 +254,29 @@ static Value fn_deinterleave(std::vector<Value>& args, Interpreter& I) {
     int N = L / 2;
     std::valarray<Real> a(Real(0), N), b(Real(0), N);
     for (int i = 0; i < N; ++i) { a[i] = in[2*i]; b[i] = in[2*i+1]; }
-    auto out = std::make_shared<Array>();
-    out->elems.push_back(NumVal(a));
-    out->elems.push_back(NumVal(b));
-    return out;
+    return pack_pair(NumVal(a), NumVal(b), "deinterleave");
 }
 
-// interleave(channels) -> NumVal: interleaved stereo signal
-// channels: Array of exactly 2 NumVals of the same length.
+// interleave(packed) -> NumVal, where packed = [a..., b...]
 static Value fn_interleave(std::vector<Value>& args, Interpreter& I) {
     if (args.size() != 1)
-        throw Error{I.filename, I.cur_line(), "interleave: 1 argument required (array of 2 vectors)"};
-    if (!std::holds_alternative<ArrayPtr>(args[0]))
-        throw Error{I.filename, I.cur_line(), "interleave: argument must be an array of 2 vectors"};
-    const auto& lst = std::get<ArrayPtr>(args[0])->elems;
-    if (lst.size() != 2)
-        throw Error{I.filename, I.cur_line(), "interleave: array must contain exactly 2 vectors"};
-    const NumVal& a = sig_nvec(lst[0], "interleave");
-    const NumVal& b = sig_nvec(lst[1], "interleave");
+        throw Error{I.filename, I.cur_line(), "interleave: 1 argument required (packed pair or legacy array)"};
+
+    NumVal a, b;
+    if (std::holds_alternative<NumVal>(args[0])) {
+        const NumVal& packed = std::get<NumVal>(args[0]);
+        a = packed_first(packed, "interleave");
+        b = packed_second(packed, "interleave");
+    } else if (std::holds_alternative<ArrayPtr>(args[0])) {
+        const auto& lst = std::get<ArrayPtr>(args[0])->elems;
+        if (lst.size() != 2)
+            throw Error{I.filename, I.cur_line(), "interleave: legacy array must contain exactly 2 vectors"};
+        a = std::get<NumVal>(lst[0]);
+        b = std::get<NumVal>(lst[1]);
+    } else {
+        throw Error{I.filename, I.cur_line(), "interleave: argument must be packed vector or array of 2 vectors"};
+    }
+
     if (a.size() != b.size())
         throw Error{I.filename, I.cur_line(), "interleave: both channels must have the same length"};
     int N = (int)a.size();
@@ -407,58 +285,138 @@ static Value fn_interleave(std::vector<Value>& args, Interpreter& I) {
     return NumVal(out);
 }
 
-// ── Vector ops ──────────────────────────────────────────────────────────────
+// Accessors for packed pairs [a..., b...]
+static Value fn_head(std::vector<Value>& args, Interpreter& I) {
+    if (args.size() != 1) throw Error{I.filename, I.cur_line(), "head: 1 packed argument required"};
+    return packed_first(sig_nvec(args[0], "head"), "head");
+}
 
-// vslice(v, start, n) -> NumVal: n samples starting at start
-// Needed for frame-based processing (STFT, etc.).
-// Unlike array slice(), this operates on numeric vectors.
+static Value fn_tail(std::vector<Value>& args, Interpreter& I) {
+    if (args.size() != 1) throw Error{I.filename, I.cur_line(), "tail: 1 packed argument required"};
+    return packed_second(sig_nvec(args[0], "tail"), "tail");
+}
+
+// Spectral features
+static Value fn_speccent(std::vector<Value>& args, Interpreter& I) {
+    if (args.size() != 2) throw Error{I.filename, I.cur_line(), "speccent: 2 args required (amps, freqs)"};
+    const NumVal& amps = sig_nvec(args[0], "speccent");
+    const NumVal& freqs = sig_nvec(args[1], "speccent");
+    return NumVal{speccentr<Real>(&amps[0], &freqs[0], (int)amps.size())};
+}
+static Value fn_specspread(std::vector<Value>& args, Interpreter& I) {
+    if (args.size() != 3) throw Error{I.filename, I.cur_line(), "specspread: 3 args required"};
+    const NumVal& amps = sig_nvec(args[0], "specspread");
+    const NumVal& freqs = sig_nvec(args[1], "specspread");
+    Real centroid = sig_scalar(args[2], "specspread");
+    return NumVal{specspread<Real>(&amps[0], &freqs[0], centroid, (int)amps.size())};
+}
+static Value fn_specskew(std::vector<Value>& args, Interpreter& I) {
+    if (args.size() != 4) throw Error{I.filename, I.cur_line(), "specskew: 4 args required"};
+    const NumVal& amps = sig_nvec(args[0], "specskew");
+    const NumVal& freqs = sig_nvec(args[1], "specskew");
+    Real centroid = sig_scalar(args[2], "specskew");
+    Real spread = sig_scalar(args[3], "specskew");
+    return NumVal{specskew<Real>(&amps[0], &freqs[0], centroid, spread, (int)amps.size())};
+}
+static Value fn_speckurt(std::vector<Value>& args, Interpreter& I) {
+    if (args.size() != 4) throw Error{I.filename, I.cur_line(), "speckurt: 4 args required"};
+    const NumVal& amps = sig_nvec(args[0], "speckurt");
+    const NumVal& freqs = sig_nvec(args[1], "speckurt");
+    Real centroid = sig_scalar(args[2], "speckurt");
+    Real spread = sig_scalar(args[3], "speckurt");
+    return NumVal{speckurt<Real>(&amps[0], &freqs[0], centroid, spread, (int)amps.size())};
+}
+static Value fn_specflux(std::vector<Value>& args, Interpreter& I) {
+    if (args.size() != 2) throw Error{I.filename, I.cur_line(), "specflux: 2 args required (amps, prev_amps)"};
+    NumVal amps = std::get<NumVal>(args[0]);
+    NumVal oamps = std::get<NumVal>(args[1]);
+    if (amps.size() != oamps.size()) throw Error{I.filename, I.cur_line(), "specflux: amps and prev_amps must be same length"};
+    return NumVal{specflux<Real>(&amps[0], &oamps[0], (int)amps.size())};
+}
+static Value fn_specirr(std::vector<Value>& args, Interpreter& I) {
+    if (args.size() != 1) throw Error{I.filename, I.cur_line(), "specirr: 1 argument required"};
+    NumVal amps = std::get<NumVal>(args[0]);
+    return NumVal{specirr<Real>(&amps[0], (int)amps.size())};
+}
+static Value fn_specdecr(std::vector<Value>& args, Interpreter& I) {
+    if (args.size() != 1) throw Error{I.filename, I.cur_line(), "specdecr: 1 argument required"};
+    const NumVal& amps = sig_nvec(args[0], "specdecr");
+    return NumVal{specdecr<Real>(&amps[0], (int)amps.size())};
+}
+static Value fn_acorrf0(std::vector<Value>& args, Interpreter& I) {
+    if (args.size() != 2) throw Error{I.filename, I.cur_line(), "acorrf0: 2 args required (sig, sr)"};
+    const NumVal& sig = sig_nvec(args[0], "acorrf0");
+    Real sr = sig_scalar(args[1], "acorrf0");
+    std::valarray<Real> buff(sig.size());
+    return NumVal{acfF0Estimate<Real>(sr, &sig[0], &buff[0], (int)sig.size())};
+}
+static Value fn_energy(std::vector<Value>& args, Interpreter& I) {
+    if (args.size() != 1) throw Error{I.filename, I.cur_line(), "energy: 1 argument required"};
+    const NumVal& sig = sig_nvec(args[0], "energy");
+    return NumVal{energy<Real>(&sig[0], (int)sig.size())};
+}
+static Value fn_zcr(std::vector<Value>& args, Interpreter& I) {
+    if (args.size() != 1) throw Error{I.filename, I.cur_line(), "zcr: 1 argument required"};
+    const NumVal& sig = sig_nvec(args[0], "zcr");
+    return NumVal{zcr<Real>(&sig[0], (int)sig.size())};
+}
+
+// Convolution
+static Value fn_conv(std::vector<Value>& args, Interpreter& I) {
+    if (args.size() != 2) throw Error{I.filename, I.cur_line(), "conv: 2 arguments required"};
+    const NumVal& x = sig_nvec(args[0], "conv");
+    const NumVal& y = sig_nvec(args[1], "conv");
+    if (x.size() == 0 || y.size() == 0) throw Error{I.filename, I.cur_line(), "conv: empty signal"};
+    return NumVal(conv_one_channel(std::valarray<Real>(x), std::valarray<Real>(y)));
+}
+
+// Leave multichannel API as Array-of-vectors for now (less hot-path than STFT internals)
+static Value fn_convmc(std::vector<Value>& args, Interpreter& I) {
+    if (args.size() != 2) throw Error{I.filename, I.cur_line(), "convmc: 2 arguments required"};
+    if (!std::holds_alternative<ArrayPtr>(args[0]) || !std::holds_alternative<ArrayPtr>(args[1]))
+        throw Error{I.filename, I.cur_line(), "convmc: arguments must be arrays of vectors"};
+    const auto& matx = std::get<ArrayPtr>(args[0])->elems;
+    const auto& maty = std::get<ArrayPtr>(args[1])->elems;
+    int nx = (int)matx.size(), ny = (int)maty.size();
+    if (nx == 0 || ny == 0) throw Error{I.filename, I.cur_line(), "convmc: empty channel list"};
+    int max_ch = std::max(nx, ny);
+    auto out = std::make_shared<Array>();
+    for (int i = 0; i < max_ch; ++i) {
+        const NumVal& xch = sig_nvec(matx[i < nx ? i : nx-1], "convmc");
+        const NumVal& ych = sig_nvec(maty[i < ny ? i : ny-1], "convmc");
+        out->elems.push_back(NumVal(conv_one_channel(std::valarray<Real>(xch), std::valarray<Real>(ych))));
+    }
+    return out;
+}
+
+// Vector ops
 static Value fn_vslice(std::vector<Value>& args, Interpreter& I) {
-    if (args.size() != 3)
-        throw Error{I.filename, I.cur_line(), "vslice: 3 args required (vec, start, n)"};
+    if (args.size() != 3) throw Error{I.filename, I.cur_line(), "vslice: 3 args required (vec, start, n)"};
     const NumVal& v = sig_nvec(args[0], "vslice");
     int start = (int)sig_scalar(args[1], "vslice");
-    int n     = (int)sig_scalar(args[2], "vslice");
+    int n = (int)sig_scalar(args[2], "vslice");
     if (start < 0 || n < 0 || start + n > (int)v.size())
         throw Error{I.filename, I.cur_line(), "vslice: range out of bounds"};
     return NumVal(v[std::slice(start, n, 1)]);
 }
-// vaddat(dst, pos, src) -> vector
-// Adds src into dst starting at integer sample offset pos.
-// Returns a NEW vector; does not mutate dst in place.
+
 static Value fn_vaddat(std::vector<Value>& args, Interpreter& I) {
-    if (args.size() != 3)
-        throw Error{I.filename, I.cur_line(), "vaddat: 3 args required (dst, pos, src)", {}};
-
+    if (args.size() != 3) throw Error{I.filename, I.cur_line(), "vaddat: 3 args required (dst, pos, src)"};
     const NumVal& dst = sig_nvec(args[0], "vaddat");
-    int pos           = (int)sig_scalar(args[1], "vaddat");
+    int pos = (int)sig_scalar(args[1], "vaddat");
     const NumVal& src = sig_nvec(args[2], "vaddat");
-
-    if (pos < 0)
-        throw Error{I.filename, I.cur_line(), "vaddat: position must be >= 0", {}};
-
+    if (pos < 0) throw Error{I.filename, I.cur_line(), "vaddat: position must be >= 0"};
     std::size_t need = (std::size_t)pos + src.size();
     std::size_t out_sz = std::max(dst.size(), need);
-
     std::valarray<Real> out(Real(0), out_sz);
-
-    // copy destination
-    for (std::size_t i = 0; i < dst.size(); ++i)
-        out[i] = dst[i];
-
-    // overlap-add source
-    for (std::size_t i = 0; i < src.size(); ++i)
-        out[(std::size_t)pos + i] += src[i];
-
+    for (std::size_t i = 0; i < dst.size(); ++i) out[i] = dst[i];
+    for (std::size_t i = 0; i < src.size(); ++i) out[(std::size_t)pos + i] += src[i];
     return NumVal(out);
 }
 
-// ── Filters ───────────────────────────────────────────────────────────────────
-
-// dcblock(sig [, R]) -> NumVal: DC-blocking filter
-// R is the pole radius (default 0.995). Closer to 1.0 = lower cutoff.
+// Filters
 static Value fn_dcblock(std::vector<Value>& args, Interpreter& I) {
-    if (args.size() < 1 || args.size() > 2)
-        throw Error{I.filename, I.cur_line(), "dcblock: 1 or 2 args required (sig [, R])"};
+    if (args.size() < 1 || args.size() > 2) throw Error{I.filename, I.cur_line(), "dcblock: 1 or 2 args required (sig [, R])"};
     const NumVal& x = sig_nvec(args[0], "dcblock");
     Real R = args.size() == 2 ? sig_scalar(args[1], "dcblock") : Real(0.995);
     int N = (int)x.size();
@@ -469,17 +427,14 @@ static Value fn_dcblock(std::vector<Value>& args, Interpreter& I) {
     return NumVal(y);
 }
 
-// reson(sig, sr, freq, tau) -> NumVal: resonating bandpass filter
-// Output length = sr * tau samples.
 static Value fn_reson(std::vector<Value>& args, Interpreter& I) {
-    if (args.size() != 4)
-        throw Error{I.filename, I.cur_line(), "reson: 4 args required (sig, sr, freq, tau)"};
+    if (args.size() != 4) throw Error{I.filename, I.cur_line(), "reson: 4 args required (sig, sr, freq, tau)"};
     const NumVal& x = sig_nvec(args[0], "reson");
-    Real sr   = sig_scalar(args[1], "reson");
+    Real sr = sig_scalar(args[1], "reson");
     Real freq = sig_scalar(args[2], "reson");
-    Real tau  = sig_scalar(args[3], "reson");
+    Real tau = sig_scalar(args[3], "reson");
     Real om = 2 * M_PI * (freq / sr);
-    Real B  = 1.0 / tau, t = 1.0 / sr;
+    Real B = 1.0 / tau, t = 1.0 / sr;
     Real radius = exp(-2.0 * M_PI * B * t);
     Real a1 = -2 * radius * cos(om);
     Real a2 = radius * radius;
@@ -495,14 +450,19 @@ static Value fn_reson(std::vector<Value>& args, Interpreter& I) {
     return NumVal(out);
 }
 
-// filter(x, b, a) -> NumVal: direct-form II biquad filter
-// b: feedforward coefficients, a: feedback coefficients (a[0] normalises)
+// filter(x, coeffs) or filter(x, b, a)
 static Value fn_filter(std::vector<Value>& args, Interpreter& I) {
-    if (args.size() != 3)
-        throw Error{I.filename, I.cur_line(), "filter: 3 args required (sig, b, a)"};
+    if (args.size() != 2 && args.size() != 3)
+        throw Error{I.filename, I.cur_line(), "filter: 2 or 3 args required (sig, coeffs) or (sig, b, a)"};
     const NumVal& x = sig_nvec(args[0], "filter");
-    const NumVal& b = sig_nvec(args[1], "filter");
-    const NumVal& a = sig_nvec(args[2], "filter");
+    std::valarray<Real> b, a;
+    if (args.size() == 2) {
+        const NumVal& coeffs = sig_nvec(args[1], "filter");
+        unpack_biquad_coeffs(coeffs, b, a, "filter");
+    } else {
+        b = std::valarray<Real>(sig_nvec(args[1], "filter"));
+        a = std::valarray<Real>(sig_nvec(args[2], "filter"));
+    }
     if (b.size() == 0) throw Error{I.filename, I.cur_line(), "filter: b must be non-empty"};
     if (a.size() == 0) throw Error{I.filename, I.cur_line(), "filter: a must be non-empty"};
     Real a0 = a[0];
@@ -519,21 +479,16 @@ static Value fn_filter(std::vector<Value>& args, Interpreter& I) {
     return NumVal(y);
 }
 
-// filtdesign(type, Fs, f0, Q, gain_db) -> Array of [b, a] vectors
-// type (string): "lowpass" "highpass" "notch" "peak" "lowshelf" "highshelf"
-// Returns [b_vec, a_vec] where each is a NumVal of length 3.
+// filtdesign(type, Fs, f0, Q, gain_db) -> packed NumVal [b0 b1 b2 1 a1 a2]
 static Value fn_filtdesign(std::vector<Value>& args, Interpreter& I) {
-    if (args.size() != 5)
-        throw Error{I.filename, I.cur_line(), "filtdesign: 5 args (type, Fs, f0, Q, gain_db)"};
-    if (!std::holds_alternative<std::string>(args[0]))
-        throw Error{I.filename, I.cur_line(), "filtdesign: type must be a string"};
+    if (args.size() != 5) throw Error{I.filename, I.cur_line(), "filtdesign: 5 args (type, Fs, f0, Q, gain_db)"};
+    if (!std::holds_alternative<std::string>(args[0])) throw Error{I.filename, I.cur_line(), "filtdesign: type must be a string"};
     const std::string& type = std::get<std::string>(args[0]);
-    Real Fs  = sig_scalar(args[1], "filtdesign");
-    Real f0  = sig_scalar(args[2], "filtdesign");
-    Real Q   = sig_scalar(args[3], "filtdesign");
+    Real Fs = sig_scalar(args[1], "filtdesign");
+    Real f0 = sig_scalar(args[2], "filtdesign");
+    Real Q = sig_scalar(args[3], "filtdesign");
     Real dBg = sig_scalar(args[4], "filtdesign");
-    if (Fs <= 0 || f0 <= 0 || f0 >= Fs/2)
-        throw Error{I.filename, I.cur_line(), "filtdesign: invalid Fs or f0"};
+    if (Fs <= 0 || f0 <= 0 || f0 >= Fs/2) throw Error{I.filename, I.cur_line(), "filtdesign: invalid Fs or f0"};
     if (Q <= 0) throw Error{I.filename, I.cur_line(), "filtdesign: Q must be > 0"};
     Real w0 = Real(2.0 * M_PI * f0 / Fs);
     Real cosw = cos(w0), sinw = sin(w0);
@@ -541,17 +496,13 @@ static Value fn_filtdesign(std::vector<Value>& args, Interpreter& I) {
     Real A = pow(Real(10.0), dBg / Real(40.0));
     Real b0=0, b1=0, b2=0, a0=0, a1=0, a2=0;
     if (type == "lowpass") {
-        b0=(1-cosw)/2; b1=1-cosw; b2=(1-cosw)/2;
-        a0=1+alpha; a1=-2*cosw; a2=1-alpha;
+        b0=(1-cosw)/2; b1=1-cosw; b2=(1-cosw)/2; a0=1+alpha; a1=-2*cosw; a2=1-alpha;
     } else if (type == "highpass") {
-        b0=(1+cosw)/2; b1=-(1+cosw); b2=(1+cosw)/2;
-        a0=1+alpha; a1=-2*cosw; a2=1-alpha;
+        b0=(1+cosw)/2; b1=-(1+cosw); b2=(1+cosw)/2; a0=1+alpha; a1=-2*cosw; a2=1-alpha;
     } else if (type == "notch") {
-        b0=1; b1=-2*cosw; b2=1;
-        a0=1+alpha; a1=-2*cosw; a2=1-alpha;
+        b0=1; b1=-2*cosw; b2=1; a0=1+alpha; a1=-2*cosw; a2=1-alpha;
     } else if (type == "peak" || type == "peaking") {
-        b0=1+alpha*A; b1=-2*cosw; b2=1-alpha*A;
-        a0=1+alpha/A; a1=-2*cosw; a2=1-alpha/A;
+        b0=1+alpha*A; b1=-2*cosw; b2=1-alpha*A; a0=1+alpha/A; a1=-2*cosw; a2=1-alpha/A;
     } else if (type == "lowshelf" || type == "loshelf") {
         Real sA = sqrt(A);
         b0=A*((A+1)-(A-1)*cosw+2*sA*alpha);
@@ -569,44 +520,39 @@ static Value fn_filtdesign(std::vector<Value>& args, Interpreter& I) {
         a1=2*((A-1)-(A+1)*cosw);
         a2=(A+1)-(A-1)*cosw-2*sA*alpha;
     } else {
-        throw Error{I.filename, I.cur_line(), "filtdesign: unknown type '" + type + "'"};
+        throw Error{I.filename, I.cur_line(), "filtdesign: unknown filter type"};
     }
-    b0/=a0; b1/=a0; b2/=a0; a1/=a0; a2/=a0; a0=1;
-    NumVal bv(3), av(3);
-    bv[0]=b0; bv[1]=b1; bv[2]=b2;
-    av[0]=a0; av[1]=a1; av[2]=a2;
-    auto out = std::make_shared<Array>();
-    out->elems.push_back(bv);
-    out->elems.push_back(av);
-    return out;
+    b0 /= a0; b1 /= a0; b2 /= a0; a1 /= a0; a2 /= a0; a0 = 1;
+    std::valarray<Real> out(Real(0), 6);
+    out[0]=b0; out[1]=b1; out[2]=b2; out[3]=1.0; out[4]=a1; out[5]=a2;
+    return NumVal(out);
 }
 
-// delay(sig, D) -> NumVal: fractional sample delay (linear interpolation)
 static Value fn_delay(std::vector<Value>& args, Interpreter& I) {
-    if (args.size() != 2)
-        throw Error{I.filename, I.cur_line(), "delay: 2 args required (sig, D)"};
+    if (args.size() != 2) throw Error{I.filename, I.cur_line(), "delay: 2 args required (sig, D)"};
     const NumVal& x = sig_nvec(args[0], "delay");
     Real D = sig_scalar(args[1], "delay");
     int N = (int)x.size();
     std::valarray<Real> y(Real(0), N);
+    if (N == 0) return NumVal(y);
     for (int n = 0; n < N; ++n) {
         Real pos = (Real)n - D;
-        if (pos <= 0) { y[n] = 0; continue; }
-        int i0 = (int)floor(pos);
-        Real frac = pos - i0;
-        y[n] = (i0 >= N-1) ? x[N-1] : (1-frac)*x[i0] + frac*x[i0+1];
+        if (pos <= (Real)0) y[n] = 0;
+        else {
+            int i0 = (int)floor(pos);
+            Real frac = pos - (Real)i0;
+            if (i0 >= N - 1) y[n] = x[N - 1];
+            else y[n] = ((Real)1.0 - frac) * x[i0] + frac * x[i0 + 1];
+        }
     }
     return NumVal(y);
 }
 
-// comb(sig, D, g) -> NumVal: feedback comb filter
-// D: delay in samples (integer), g: feedback gain
 static Value fn_comb(std::vector<Value>& args, Interpreter& I) {
-    if (args.size() != 3)
-        throw Error{I.filename, I.cur_line(), "comb: 3 args required (sig, D, g)"};
+    if (args.size() != 3) throw Error{I.filename, I.cur_line(), "comb: 3 args required (sig, D, g)"};
     const NumVal& x = sig_nvec(args[0], "comb");
-    int D   = (int)sig_scalar(args[1], "comb");
-    Real g  = sig_scalar(args[2], "comb");
+    int D = (int)sig_scalar(args[1], "comb");
+    Real g = sig_scalar(args[2], "comb");
     if (D < 0) throw Error{I.filename, I.cur_line(), "comb: delay must be non-negative"};
     int N = (int)x.size();
     std::valarray<Real> y(Real(0), N);
@@ -617,13 +563,10 @@ static Value fn_comb(std::vector<Value>& args, Interpreter& I) {
     return NumVal(y);
 }
 
-// allpass(sig, D, g) -> NumVal: Schroeder allpass filter
-// D: delay in samples (integer), g: coefficient
 static Value fn_allpass(std::vector<Value>& args, Interpreter& I) {
-    if (args.size() != 3)
-        throw Error{I.filename, I.cur_line(), "allpass: 3 args required (sig, D, g)"};
+    if (args.size() != 3) throw Error{I.filename, I.cur_line(), "allpass: 3 args required (sig, D, g)"};
     const NumVal& x = sig_nvec(args[0], "allpass");
-    int D  = (int)sig_scalar(args[1], "allpass");
+    int D = (int)sig_scalar(args[1], "allpass");
     Real g = sig_scalar(args[2], "allpass");
     if (D < 0) throw Error{I.filename, I.cur_line(), "allpass: delay must be non-negative"};
     int N = (int)x.size();
@@ -636,30 +579,22 @@ static Value fn_allpass(std::vector<Value>& args, Interpreter& I) {
     return NumVal(y);
 }
 
-// resample(sig, factor) -> NumVal: frequency-domain resampling
-// factor > 1: upsample, factor < 1: downsample
 static Value fn_resample(std::vector<Value>& args, Interpreter& I) {
-    if (args.size() != 2)
-        throw Error{I.filename, I.cur_line(), "resample: 2 args required (sig, factor)"};
+    if (args.size() != 2) throw Error{I.filename, I.cur_line(), "resample: 2 args required (sig, factor)"};
     const NumVal& x = sig_nvec(args[0], "resample");
-    Real factor     = sig_scalar(args[1], "resample");
+    Real factor = sig_scalar(args[1], "resample");
     return NumVal(fd_resample(std::valarray<Real>(x), factor));
 }
 
-// ── Registration ──────────────────────────────────────────────────────────────
-
 inline void add_signals(Environment& env) {
-    // Synthesis
     env.register_builtin("mix",          fn_mix);
     env.register_builtin("gen",          fn_gen);
     env.register_builtin("osc",          fn_osc);
-    // Frequency domain
     env.register_builtin("fft",          fn_fft);
     env.register_builtin("ifft",         fn_ifft);
     env.register_builtin("car2pol",      fn_car2pol);
     env.register_builtin("pol2car",      fn_pol2car);
     env.register_builtin("window",       fn_window);
-    // Spectral features
     env.register_builtin("speccent",     fn_speccent);
     env.register_builtin("specspread",   fn_specspread);
     env.register_builtin("specskew",     fn_specskew);
@@ -670,16 +605,14 @@ inline void add_signals(Environment& env) {
     env.register_builtin("acorrf0",      fn_acorrf0);
     env.register_builtin("energy",       fn_energy);
     env.register_builtin("zcr",          fn_zcr);
-    // Convolution
     env.register_builtin("conv",         fn_conv);
     env.register_builtin("convmc",       fn_convmc);
-    // Interleave
     env.register_builtin("deinterleave", fn_deinterleave);
     env.register_builtin("interleave",   fn_interleave);
-    // Vector slice (needed for STFT frame extraction)
-    env.register_builtin("vslice",       fn_vslice);    
-    env.register_builtin("vaddat", fn_vaddat);    
-    // Filters
+    env.register_builtin("head",         fn_head);
+    env.register_builtin("tail",         fn_tail);
+    env.register_builtin("vslice",       fn_vslice);
+    env.register_builtin("vaddat",       fn_vaddat);
     env.register_builtin("dcblock",      fn_dcblock);
     env.register_builtin("reson",        fn_reson);
     env.register_builtin("filter",       fn_filter);
@@ -691,4 +624,3 @@ inline void add_signals(Environment& env) {
 }
 
 #endif // SIGNALS_H
-// eof

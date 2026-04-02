@@ -29,7 +29,7 @@ var i = 0
 while (i < nframes) {
     var magphi   = car2pol(data[i])
     var magphi_d = deinterleave(magphi)
-    var ampsfull = magphi_d[0]
+    var ampsfull = head(magphi_d)
     var amps     = vslice(ampsfull, 0, Nspec)
 
     var c  = speccent(amps, freqs)

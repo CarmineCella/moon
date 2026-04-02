@@ -18,7 +18,7 @@ var input    = chans[0]
 var spec     = fft(input)
 var polar    = car2pol(spec)
 var magphi   = deinterleave(polar)
-var mag0     = magphi[0]
+var mag0     = head(magphi)
 var nfft     = len(mag0)
 
 var mag      = vslice(mag0, offset, nwin)

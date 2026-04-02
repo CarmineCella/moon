@@ -28,19 +28,17 @@ proc normalize (sig, target) {
 
 # ── Filter design + application ───────────────────────────────────────────────
 
-# design_biquad(type, Fs, f0, Q, gain_db) -> [b, a]
+# design_biquad(type, Fs, f0, Q, gain_db) -> packed biquad coefficients
 # type: "lowpass" "highpass" "notch" "peak" "lowshelf" "highshelf"
-# Returns an Array [b_vec, a_vec] suitable for apply_biquad.
+# Returns packed coefficients [b0 b1 b2 1 a1 a2] suitable for apply_biquad.
 proc design_biquad (type, Fs, f0, Q, gain_db) {
     return filtdesign(type, Fs, f0, Q, gain_db)
 }
 
 # apply_biquad(sig, coeffs) — apply a single biquad filter
-# coeffs: [b, a] as returned by design_biquad / filtdesign
+# coeffs: packed [b0 b1 b2 1 a1 a2] as returned by design_biquad / filtdesign
 proc apply_biquad (sig, coeffs) {
-    var b = coeffs[0]
-    var a = coeffs[1]
-    return filter(sig, b, a)
+    return filter(sig, coeffs)
 }
 
 # apply_biquad_chain2(sig, coeffs1, coeffs2) — apply two biquads in series
@@ -189,11 +187,7 @@ proc istft (specs, N, hop) {
     while (k < nframes) {
         var frame   = ifft(specs[k]) * win  # inverse FFT + synthesis window
         var pos     = k * hop
-        var i       = 0
-        while (i < N) {
-            out[pos + i] = out[pos + i] + frame[i]   # overlap-add
-            i = i + 1
-        }
+        out = vaddat(out, pos, frame)
         k = k + 1
     }
 

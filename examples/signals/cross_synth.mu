@@ -33,15 +33,15 @@ while (i < min_len) {
     var buff1   = vslice(sig1, i, sz) * bwin
     var spec1_p = car2pol(fft(buff1))
     var magphi1 = deinterleave(spec1_p)
-    var amps1   = magphi1[0]
-    var phi1    = magphi1[1]
+    var amps1   = head(magphi1)
+    var phi1    = tail(magphi1)
     amps1 = amps1 * (amps1 > threshold)
 
     var buff2   = vslice(sig2, i, sz) * bwin
     var spec2_p = car2pol(fft(buff2))
     var magphi2 = deinterleave(spec2_p)
-    var amps2   = magphi2[0]
-    var phi2    = magphi2[1]
+    var amps2   = head(magphi2)
+    var phi2    = tail(magphi2)
 
     var outamps = sqrt(amps1 * amps2)
     var outphi  = phi2

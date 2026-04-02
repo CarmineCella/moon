@@ -17,8 +17,8 @@ var phis = []
 var i = 0
 while (i < nframes) {
     var mp = deinterleave(car2pol(spec_list[i]))
-    push(amps, mp[0])
-    push(phis, mp[1])
+    push(amps, head(mp))
+    push(phis, tail(mp))
     i = i + 1
 }
 
