@@ -1,10 +1,6 @@
 # Musil  
 
-# Moonil
-
 ![Musil logo](docs/musil_logo.png)
-
-*A Scripting Language for Sound And Music Computing*
 
 **Musil** is a tiny and expressive language designed to be easy to use, easy to expand and easy to embed in host applications.
 
