@@ -11,7 +11,7 @@
 
 load("stdlib.mu")
 load("scientific.mu")
-# load("plotting.mu")    # uncomment once the plotting library is converted
+load("plotting.mu")
 
 # ── 1. Read CSV ───────────────────────────────────────────────────────────────
 
@@ -58,8 +58,7 @@ while (ei < len(IRIS_EIG)) {
     ei = ei + 1
 }
 
-# Plotting: uncomment when the plotting library is available
-# plot("Iris PCA eigenvalues", IRIS_EIG, "eigenvalues", "*")
+plot("Iris PCA eigenvalues", IRIS_EIG, "eigenvalues", "*")
 
 # ── 4. K-means on petal features (length, width) ─────────────────────────────
 # Extract petal length (col 2) and petal width (col 3) as NumVals.
@@ -101,12 +100,11 @@ while (si < 3) {
     si = si + 1
 }
 
-# Plotting (uncomment when plotting library is available):
-# scatter("Iris: petal length vs width",
-#         PETAL_LEN, PETAL_WID, "samples", ".")
-# scatter("Iris k-means centroids",
-#         PETAL_LEN, PETAL_WID, "samples",
-#         CENTS_X,  CENTS_Y,   "centroids", ".")
+scatter("Iris: petal length vs width",
+        PETAL_LEN, PETAL_WID, "samples", ".")
+scatter("Iris k-means centroids",
+        PETAL_LEN, PETAL_WID, "samples",
+        CENTS_X,  CENTS_Y,   "centroids", ".")
 
 print ""
-print "done  (scatter plots stubbed — load plotting.mu to enable)"
+print "done"
