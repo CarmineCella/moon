@@ -1,6 +1,6 @@
 # Moonil  
 
-*A tiny interpreter for music research*
+*A Scripting Language for Sound And Music Computing*
 
 **Moonil** (pron. moo-neel) is a tiny and expressive language designed to be easy to use, easy to expand and easy to embed in host applications.
 
