@@ -44,6 +44,7 @@ install(TARGETS musil
 install(FILES
     ${CMAKE_SOURCE_DIR}/src/stdlib.mu
     ${CMAKE_SOURCE_DIR}/src/scientific.mu
+    ${CMAKE_SOURCE_DIR}/src/signals.mu
     DESTINATION $ENV{HOME}/.musil
 )
 

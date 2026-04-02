@@ -407,7 +407,7 @@ static Value fn_interleave(std::vector<Value>& args, Interpreter& I) {
     return NumVal(out);
 }
 
-// ── Vector slice ──────────────────────────────────────────────────────────────
+// ── Vector ops ──────────────────────────────────────────────────────────────
 
 // vslice(v, start, n) -> NumVal: n samples starting at start
 // Needed for frame-based processing (STFT, etc.).
@@ -421,6 +421,35 @@ static Value fn_vslice(std::vector<Value>& args, Interpreter& I) {
     if (start < 0 || n < 0 || start + n > (int)v.size())
         throw Error{I.filename, I.cur_line(), "vslice: range out of bounds"};
     return NumVal(v[std::slice(start, n, 1)]);
+}
+// vaddat(dst, pos, src) -> vector
+// Adds src into dst starting at integer sample offset pos.
+// Returns a NEW vector; does not mutate dst in place.
+static Value fn_vaddat(std::vector<Value>& args, Interpreter& I) {
+    if (args.size() != 3)
+        throw Error{I.filename, I.cur_line(), "vaddat: 3 args required (dst, pos, src)", {}};
+
+    const NumVal& dst = sig_nvec(args[0], "vaddat");
+    int pos           = (int)sig_scalar(args[1], "vaddat");
+    const NumVal& src = sig_nvec(args[2], "vaddat");
+
+    if (pos < 0)
+        throw Error{I.filename, I.cur_line(), "vaddat: position must be >= 0", {}};
+
+    std::size_t need = (std::size_t)pos + src.size();
+    std::size_t out_sz = std::max(dst.size(), need);
+
+    std::valarray<Real> out(Real(0), out_sz);
+
+    // copy destination
+    for (std::size_t i = 0; i < dst.size(); ++i)
+        out[i] = dst[i];
+
+    // overlap-add source
+    for (std::size_t i = 0; i < src.size(); ++i)
+        out[(std::size_t)pos + i] += src[i];
+
+    return NumVal(out);
 }
 
 // ── Filters ───────────────────────────────────────────────────────────────────
@@ -648,7 +677,8 @@ inline void add_signals(Environment& env) {
     env.register_builtin("deinterleave", fn_deinterleave);
     env.register_builtin("interleave",   fn_interleave);
     // Vector slice (needed for STFT frame extraction)
-    env.register_builtin("vslice",       fn_vslice);
+    env.register_builtin("vslice",       fn_vslice);    
+    env.register_builtin("vaddat", fn_vaddat);    
     // Filters
     env.register_builtin("dcblock",      fn_dcblock);
     env.register_builtin("reson",        fn_reson);
