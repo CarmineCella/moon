@@ -5,6 +5,7 @@
 **Moon** is a tiny and expressive language designed to be small, easy to expand and easy to embed in host applications.
 
 The core of the language is made of a single [C++ header](src/moon.h) and a [standard library](src/stdlib.moon) written in **Moon**.
+A more or less comprehensive overview of the language can be found [here](examples/reference.moon).
 
 # Building
 
