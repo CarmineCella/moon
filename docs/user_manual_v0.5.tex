@@ -1,5 +1,5 @@
 % ─────────────────────────────────────────────────────────────────────────────
-%  Moon v0.5 — User Manual
+%  Musil v0.5 — User Manual
 % ─────────────────────────────────────────────────────────────────────────────
 \documentclass[11pt,a4paper]{article}
 
@@ -22,27 +22,27 @@
 \usepackage{amsmath}
 
 % ── Colours ──────────────────────────────────────────────────────────────────
-\definecolor{moonblue}{RGB}{25,80,140}
-\definecolor{moongray}{RGB}{245,245,245}
-\definecolor{moongreen}{RGB}{0,120,60}
-\definecolor{moonred}{RGB}{160,30,30}
-\definecolor{moonpurple}{RGB}{100,0,150}
-\definecolor{mooncomment}{RGB}{100,100,100}
+\definecolor{musilblue}{RGB}{25,80,140}
+\definecolor{musilgray}{RGB}{245,245,245}
+\definecolor{musilgreen}{RGB}{0,120,60}
+\definecolor{musilred}{RGB}{160,30,30}
+\definecolor{musilpurple}{RGB}{100,0,150}
+\definecolor{musilcomment}{RGB}{100,100,100}
 
 % ── Listings setup ────────────────────────────────────────────────────────────
-\lstdefinelanguage{Moon}{
+\lstdefinelanguage{Musil}{
   morekeywords={var,proc,return,if,else,while,for,in,break,and,or,not,print,load},
   morestring=[b]",
   morecomment=[l]{\#},
   sensitive=true,
 }
-\lstdefinestyle{moon}{
-  language=Moon,
-  backgroundcolor=\color{moongray},
+\lstdefinestyle{musil}{
+  language=Musil,
+  backgroundcolor=\color{musilgray},
   basicstyle=\ttfamily\small,
-  keywordstyle=\color{moonblue}\bfseries,
-  stringstyle=\color{moonred},
-  commentstyle=\color{mooncomment}\itshape,
+  keywordstyle=\color{musilblue}\bfseries,
+  stringstyle=\color{musilred},
+  commentstyle=\color{musilcomment}\itshape,
   numberstyle=\tiny\color{gray},
   numbers=left,
   numbersep=8pt,
@@ -54,30 +54,30 @@
   showstringspaces=false,
   tabsize=4,
 }
-\lstdefinestyle{mooninline}{
-  language=Moon,
+\lstdefinestyle{musilinline}{
+  language=Musil,
   basicstyle=\ttfamily,
-  keywordstyle=\color{moonblue}\bfseries,
-  stringstyle=\color{moonred},
-  commentstyle=\color{mooncomment},
+  keywordstyle=\color{musilblue}\bfseries,
+  stringstyle=\color{musilred},
+  commentstyle=\color{musilcomment},
   showstringspaces=false,
 }
-\lstset{style=moon}
+\lstset{style=musil}
 
-\newcommand{\moon}[1]{\lstinline[style=mooninline]{#1}}
+\newcommand{\musil}[1]{\lstinline[style=musilinline]{#1}}
 
 % ── Section formatting ────────────────────────────────────────────────────────
-\titleformat{\section}{\large\bfseries\color{moonblue}}{{\thesection}}{1em}{}[\vspace{-0.3em}\rule{\linewidth}{0.5pt}]
-\titleformat{\subsection}{\normalsize\bfseries\color{moonblue!80}}{{\thesubsection}}{1em}{}
+\titleformat{\section}{\large\bfseries\color{musilblue}}{{\thesection}}{1em}{}[\vspace{-0.3em}\rule{\linewidth}{0.5pt}]
+\titleformat{\subsection}{\normalsize\bfseries\color{musilblue!80}}{{\thesubsection}}{1em}{}
 
 % ── Note / warning boxes ──────────────────────────────────────────────────────
-\newenvironment{note}{\begin{mdframed}[backgroundcolor=blue!6,linecolor=moonblue,linewidth=0.8pt]\textbf{Note:}\ }{\end{mdframed}}
-\newenvironment{warn}{\begin{mdframed}[backgroundcolor=red!6,linecolor=moonred,linewidth=0.8pt]\textbf{Warning:}\ }{\end{mdframed}}
+\newenvironment{note}{\begin{mdframed}[backgroundcolor=blue!6,linecolor=musilblue,linewidth=0.8pt]\textbf{Note:}\ }{\end{mdframed}}
+\newenvironment{warn}{\begin{mdframed}[backgroundcolor=red!6,linecolor=musilred,linewidth=0.8pt]\textbf{Warning:}\ }{\end{mdframed}}
 
 % ── Header / footer ──────────────────────────────────────────────────────────
 \pagestyle{fancy}
 \fancyhf{}
-\fancyhead[L]{\small\textit{Moon v0.5 User Manual}}
+\fancyhead[L]{\small\textit{Musil v0.5 User Manual}}
 \fancyhead[R]{\small\thepage}
 \renewcommand{\headrulewidth}{0.3pt}
 
@@ -98,7 +98,7 @@
 \begin{titlepage}
 \centering
 \vspace*{3cm}
-{\fontsize{48}{56}\selectfont\color{moonblue}\textbf{Moonil}}\par
+{\fontsize{48}{56}\selectfont\color{musilblue}\textbf{Musil}}\par
 \vspace{0.5cm}
 {\LARGE\color{gray} A Scripting Language for Sound And Music Computing}\par
 \vspace{0.3cm}
@@ -107,7 +107,7 @@
 \rule{0.5\linewidth}{0.5pt}\par
 \vspace{1.5cm}
 {\normalsize
-Moon is a small, expressive scripting language designed as a control and computation
+Musil is a small, expressive scripting language designed as a control and computation
 layer for algorithmic composition, signal processing, and music technology research.
 It provides first-class numeric vectors, heterogeneous arrays, first-class procedures,
 file I/O, and a clean extension API for connecting to C++ libraries.
@@ -124,8 +124,8 @@ file I/O, and a clean extension API for connecting to C++ libraries.
 \label{sec:overview}
 % ─────────────────────────────────────────────────────────────────────────────
 
-Moon is a dynamically-typed, interpreted scripting language implemented as a
-single C++ header (\texttt{moon.h}). It is designed for use as a frontend for
+Musil is a dynamically-typed, interpreted scripting language implemented as a
+single C++ header (\texttt{musil.h}). It is designed for use as a frontend for
 C++ tools in music technology, orchestration, and signal processing.
 
 \subsection*{Key characteristics}
@@ -134,13 +134,13 @@ C++ tools in music technology, orchestration, and signal processing.
   \item \textbf{Numeric vectors} are \texttt{std::valarray<double>} under the hood; all arithmetic and math functions apply element-wise with scalar broadcasting.
   \item \textbf{Heterogeneous arrays} hold any mix of values; they have reference semantics (assignment shares the data).
   \item \textbf{First-class procedures} can be stored in variables, passed as arguments, and stored in arrays.
-  \item \textbf{Modular:} \moon{load("file.moon")} executes another file in the current environment; the \texttt{\textasciitilde/.moon/} directory is on the search path.
-  \item \textbf{Extensible:} register C++ functions as Moon builtins with one line.
+  \item \textbf{Modular:} \musil{load("file.mu")} executes another file in the current environment; the \texttt{\textasciitilde/.musil/} directory is on the search path.
+  \item \textbf{Extensible:} register C++ functions as Musil builtins with one line.
 \end{itemize}
 
 \subsection*{Building and running}
 To compile using CMake, from the \emph{root} folder type:
-\begin{lstlisting}[style=moon, numbers=none]
+\begin{lstlisting}[style=musil, numbers=none]
 mkdir build
 cd build
 cmake ..
@@ -148,25 +148,25 @@ make
 \end{lstlisting}
 
 You can also compile the code manually, from the {src} folder, with:
-\begin{lstlisting}[style=moon, numbers=none]
-g++ -std=c++17 -O2 -o moon moon.cpp   # compile the interpreter
+\begin{lstlisting}[style=musil, numbers=none]
+g++ -std=c++17 -O2 -o musil musil.cpp   # compile the interpreter
 \end{lstlisting}
 
 To run the interpreter, call: 
-\begin{lstlisting}[style=moon, numbers=none]
-./moon script.moon                          # run a file
-./moon lib.moon script.moon                 # run multiple files, shared state
-./moon                                      # start interactive REPL
+\begin{lstlisting}[style=musil, numbers=none]
+./musil script.mu                        # run a file
+./musil lib.mu script.mu                 # run multiple files, shared state
+./musil                                  # start interactive REPL
 \end{lstlisting}
 
-Files loaded with \moon{load()} search first in the current directory, then in \texttt{\textasciitilde/.moon/}.
+Files loaded with \musil{load()} search first in the current directory, then in \texttt{\textasciitilde/.musil/}.
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Types and Values}
 \label{sec:types}
 % ─────────────────────────────────────────────────────────────────────────────
 
-Moon has five types. Use \moon{type(x)} to inspect any value at runtime.
+Musil has five types. Use \musil{type(x)} to inspect any value at runtime.
 
 \begin{center}
 \begin{tabular}{@{}llll@{}}
@@ -176,7 +176,7 @@ Moon has five types. Use \moon{type(x)} to inspect any value at runtime.
 Scalar number  & \texttt{"number"}  & \texttt{valarray<double>} size 1   & value (copies on assign) \\
 Numeric vector & \texttt{"vector"}  & \texttt{valarray<double>} size $>$1 & value (copies on assign) \\
 String         & \texttt{"string"}  & \texttt{std::string}               & value (copies on assign) \\
-Array          & \texttt{"array"}   & \texttt{shared\_ptr<MoonArray>}    & reference (shares on assign) \\
+Array          & \texttt{"array"}   & \texttt{shared\_ptr<MusilArray>}    & reference (shares on assign) \\
 Proc           & \texttt{"proc"}    & \texttt{shared\_ptr<Proc>}         & reference (shares on assign) \\
 \bottomrule
 \end{tabular}
@@ -197,15 +197,15 @@ var tiny = 1e-10    # scientific notation supported
 var big  = 6.674e-11
 \end{lstlisting}
 
-Moon has no integer type. All numbers are IEEE 754 doubles. Use
-\moon{floor}, \moon{ceil}, and \moon{mod} when integer arithmetic is needed.
+Musil has no integer type. All numbers are IEEE 754 doubles. Use
+\musil{floor}, \musil{ceil}, and \musil{mod} when integer arithmetic is needed.
 
 \subsection{Numeric vectors}
 
 A vector is a \texttt{std::valarray<double>} with more than one element. It is
-created with the \moon{vec}, \moon{linspace}, \moon{zeros}, \moon{ones}, or
-\moon{range}-to-\moon{to\_vec} functions. All arithmetic operators and all math
-builtins (\moon{sin}, \moon{cos}, \moon{sqrt}, etc.) apply element-wise.
+created with the \musil{vec}, \musil{linspace}, \musil{zeros}, \musil{ones}, or
+\musil{range}-to-\musil{to\_vec} functions. All arithmetic operators and all math
+builtins (\musil{sin}, \musil{cos}, \musil{sqrt}, etc.) apply element-wise.
 
 \begin{lstlisting}
 var v = vec(1, 2, 3, 4, 5)     # from individual scalars
@@ -246,7 +246,7 @@ print a[3](5)       # 10    -- calling a stored proc
 \end{lstlisting}
 
 \textbf{Reference semantics:} assigning an array copies the \emph{pointer}, not
-the data. Both variables refer to the same underlying list. Use \moon{copy(a)}
+the data. Both variables refer to the same underlying list. Use \musil{copy(a)}
 to obtain an independent shallow copy.
 
 \begin{lstlisting}
@@ -260,9 +260,9 @@ z[0] = 0
 print x[0]          # x is unaffected
 \end{lstlisting}
 
-\moon{copy()} is a \emph{shallow} copy: inner arrays are still shared.
-\moon{range(lo, hi)} also produces an array (suitable for \moon{for}/\moon{in} loops).
-For numeric computation, prefer \moon{linspace} which produces a vector.
+\musil{copy()} is a \emph{shallow} copy: inner arrays are still shared.
+\musil{range(lo, hi)} also produces an array (suitable for \musil{for}/\musil{in} loops).
+For numeric computation, prefer \musil{linspace} which produces a vector.
 
 \subsection{Strings}
 
@@ -279,8 +279,8 @@ Escape sequences: \texttt{\textbackslash n} (newline), \texttt{\textbackslash t}
 
 \subsection{Procs}
 
-Procs are first-class values. A named \moon{proc} declaration stores the proc
-in the global proc table; an anonymous \moon{proc} literal creates a
+Procs are first-class values. A named \musil{proc} declaration stores the proc
+in the global proc table; an anonymous \musil{proc} literal creates a
 \texttt{shared\_ptr<Proc>} value.
 
 \begin{lstlisting}
@@ -307,8 +307,8 @@ var name = expression     # declare and initialise
 name = expression         # assign to existing variable
 \end{lstlisting}
 
-\moon{var} inside a proc creates a local variable. \moon{var} at the top level
-creates a global. Plain assignment (\moon{=} without \moon{var}) searches locals
+\musil{var} inside a proc creates a local variable. \musil{var} at the top level
+creates a global. Plain assignment (\musil{=} without \musil{var}) searches locals
 first, then globals; creates a new binding if not found.
 
 \subsection{Operator precedence}
@@ -358,15 +358,15 @@ print all(vec(1,5,3) > 0)  # all elements > 0
 print any(vec(1,5,3) > 4)  # some elements > 4
 \end{lstlisting}
 
-Use \moon{all()} and \moon{any()} to reduce a vector mask to a scalar for
-use in \moon{if} and \moon{while} conditions.
+Use \musil{all()} and \musil{any()} to reduce a vector mask to a scalar for
+use in \musil{if} and \musil{while} conditions.
 
-String equality uses \moon{==} and \moon{!=} only; ordering operators on strings
+String equality uses \musil{==} and \musil{!=} only; ordering operators on strings
 produce a runtime error.
 
 \subsection{Logical operators}
 
-\moon{and}, \moon{or}, \moon{not} always return a scalar \texttt{1} or \texttt{0}.
+\musil{and}, \musil{or}, \musil{not} always return a scalar \texttt{1} or \texttt{0}.
 Truthiness: any non-zero number, any non-empty string, any non-empty array, any
 proc is truthy; zero, empty string, and empty array are falsy.
 
@@ -387,8 +387,8 @@ if (condition) {
 }
 \end{lstlisting}
 
-Parentheses around the condition are required. Any number of \moon{else if}
-branches may appear; the final \moon{else} is optional.
+Parentheses around the condition are required. Any number of \musil{else if}
+branches may appear; the final \musil{else} is optional.
 
 \subsection{While}
 
@@ -399,8 +399,8 @@ while (condition) {
 }
 \end{lstlisting}
 
-\moon{break} exits the innermost \moon{while} or \moon{for} loop. There is no
-\moon{continue}.
+\musil{break} exits the innermost \musil{while} or \musil{for} loop. There is no
+\musil{continue}.
 
 \subsection{For / in}
 
@@ -423,19 +423,19 @@ for (var ch in "hello") {
 }
 \end{lstlisting}
 
-The loop variable is declared with \moon{var}; it is visible within the loop
-body. \moon{break} works inside \moon{for}/\moon{in}.
+The loop variable is declared with \musil{var}; it is visible within the loop
+body. \musil{break} works inside \musil{for}/\musil{in}.
 
 \begin{note}
-\moon{range(lo, hi)} produces an \emph{array}, while \moon{linspace(lo, hi, n)}
-produces a \emph{vector}. Use \moon{range} for integer loops, \moon{linspace}
+\musil{range(lo, hi)} produces an \emph{array}, while \musil{linspace(lo, hi, n)}
+produces a \emph{vector}. Use \musil{range} for integer loops, \musil{linspace}
 for mathematical sequences.
 \end{note}
 
 \subsection{Return}
 
-\moon{return expression} exits the current proc and passes the value to the
-caller. A proc that falls off the end without \moon{return} returns \texttt{0}.
+\musil{return expression} exits the current proc and passes the value to the
+caller. A proc that falls off the end without \musil{return} returns \texttt{0}.
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Procedures}
@@ -470,7 +470,7 @@ in arrays. They are first-class values.
 
 \subsection{Calling procs by value}
 
-When a variable holds a proc, calling it uses the same \moon{name(args)} syntax:
+When a variable holds a proc, calling it uses the same \musil{name(args)} syntax:
 
 \begin{lstlisting}
 var transforms = [
@@ -492,8 +492,8 @@ proc map (a, f) {
 var doubled = map([1,2,3,4], proc(x){ return x*2 })
 \end{lstlisting}
 
-The stdlib provides \moon{map}, \moon{filter}, and \moon{reduce}. The
-\moon{apply(f, args)} builtin calls a proc value or a named proc with an array
+The stdlib provides \musil{map}, \musil{filter}, and \musil{reduce}. The
+\musil{apply(f, args)} builtin calls a proc value or a named proc with an array
 of arguments.
 
 \subsection{Recursion}
@@ -579,7 +579,7 @@ for (var x in vec(1, 2, 3, 4, 5)) {
 
 \subsection{Conversion}
 
-\moon{to\_arr(v)} converts a vector to an array of numbers. \moon{to\_vec(a)}
+\musil{to\_arr(v)} converts a vector to an array of numbers. \musil{to\_vec(a)}
 converts an array of numbers to a vector (fails if any element is non-numeric).
 
 % ─────────────────────────────────────────────────────────────────────────────
@@ -649,8 +649,8 @@ print x[0]              # x unaffected
 
 \begin{warn}
 Arrays passed to procs are passed by reference. A proc that calls
-\moon{push}, \moon{pop}, \moon{insert}, or \moon{remove} on a parameter
-will modify the caller's array. Call \moon{copy(a)} inside the proc if you
+\musil{push}, \musil{pop}, \musil{insert}, or \musil{remove} on a parameter
+will modify the caller's array. Call \musil{copy(a)} inside the proc if you
 need a local version.
 \end{warn}
 
@@ -663,15 +663,15 @@ Strings are immutable value types. The \texttt{+} operator concatenates;
 if either operand is a number it is converted to string first.
 
 \begin{lstlisting}
-var s = "Hello, " + "Moon!"
+var s = "Hello, " + "Musil!"
 var t = "score: " + 99        # "score: 99"
 print len(s)                  # 12
-print upper(s)                # "HELLO, MOON!"
+print upper(s)                # "HELLO, MUSIL!"
 print sub(s, 0, 5)            # "Hello"
 print find(s, ",")            # 5
 \end{lstlisting}
 
-Strings can be iterated character by character with \moon{for}/\moon{in}.
+Strings can be iterated character by character with \musil{for}/\musil{in}.
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{File I/O and Modules}
@@ -689,8 +689,8 @@ var content = read("/tmp/out.txt")               # whole file as string
 \subsection{Loading modules}
 
 \begin{lstlisting}
-load("stdlib.moon")          # search current dir, then ~/.moon/
-load("/abs/path/lib.moon")   # absolute path
+load("stdlib.mu")          # search current dir, then ~/.musil/
+load("/abs/path/lib.mu")   # absolute path
 \end{lstlisting}
 
 All procs and variables defined in the loaded file become globally available
@@ -700,7 +700,7 @@ will loop indefinitely.
 \subsection{Eval and exec}
 
 \begin{lstlisting}
-eval("var x = " + str(42))   # parse and execute a string as Moon code
+eval("var x = " + str(42))   # parse and execute a string as Musil code
 eval("proc cube(n){ return n*n*n }")
 
 var rc = exec("ls -l /tmp")  # run a shell command; returns exit code
@@ -828,8 +828,8 @@ Functions marked \textbf{[arr]} require an array argument.
 \texttt{read}    & \texttt{read(path)}              & Read entire file; returns string. \\
 \texttt{write}   & \texttt{write(path, text)}       & Write string to file (create or overwrite). \\
 \texttt{append}  & \texttt{append(path, text)}      & Append string to file. \\
-\texttt{load}    & \texttt{load(path)}              & Execute \texttt{.moon} file in current environment. \\
-\texttt{eval}    & \texttt{eval(code)}              & Execute string as Moon source code. \\
+\texttt{load}    & \texttt{load(path)}              & Execute \texttt{.musil} file in current environment. \\
+\texttt{eval}    & \texttt{eval(code)}              & Execute string as Musil source code. \\
 \texttt{exec}    & \texttt{exec(cmd)}               & Run shell command. Returns exit code. \\
 \bottomrule
 \end{longtable}
@@ -856,8 +856,8 @@ Functions marked \textbf{[arr]} require an array argument.
 \label{sec:stdlib}
 % ─────────────────────────────────────────────────────────────────────────────
 
-Load with \moon{load("stdlib.moon")} (the
-file must be present in the local folder, or installed in \texttt{\textasciitilde/.moon/}).
+Load with \musil{load("stdlib.mu")} (the
+file must be present in the local folder, or installed in \texttt{\textasciitilde/.musil/}).
 
 \subsection{Constants}
 
@@ -1009,21 +1009,21 @@ Global counters \texttt{\_tests\_run}, \texttt{\_tests\_passed}, and
 \texttt{\_tests\_failed} are maintained automatically.
 
 % ─────────────────────────────────────────────────────────────────────────────
-\section{Extending Moon from C++}
+\section{Extending Musil from C++}
 \label{sec:extend}
 % ─────────────────────────────────────────────────────────────────────────────
 
-Moon is designed to be embedded. Any C++ application can register custom
-builtins that become callable from Moon scripts.
+Musil is designed to be embedded. Any C++ application can register custom
+builtins that become callable from Musil scripts.
 
-\subsection{Including Moon}
+\subsection{Including Musil}
 
 \begin{lstlisting}[language=C++]
-#include "moon.h"
+#include "musil.h"
 
 int main() {
     Environment env;
-    env.exec("print \"hello\"", "script.moon");
+    env.exec("print \"hello\"", "script.mu");
 }
 \end{lstlisting}
 
@@ -1039,7 +1039,7 @@ env.register_builtin("midi_to_hz", [](std::vector<Value>& args, Interpreter& I) 
 });
 \end{lstlisting}
 
-After this call, \moon{midi_to_hz(69)} is available in all Moon scripts run
+After this call, \musil{midi_to_hz(69)} is available in all Musil scripts run
 through \texttt{env}.
 
 \subsection{Injecting global variables}
@@ -1054,11 +1054,11 @@ env.globals["SOL_PATH"]    = std::string{"/opt/sol/samples"};
 \begin{center}
 \begin{tabular}{@{}lll@{}}
 \toprule
-\textbf{Moon type} & \textbf{C++ type} & \textbf{Access} \\
+\textbf{Musil type} & \textbf{C++ type} & \textbf{Access} \\
 \midrule
 number / vector  & \texttt{NumVal} = \texttt{std::valarray<double>} & \texttt{std::get<NumVal>(v)} \\
 string           & \texttt{std::string}                              & \texttt{std::get<std::string>(v)} \\
-array            & \texttt{ArrayPtr} = \texttt{shared\_ptr<MoonArray>} & \texttt{std::get<ArrayPtr>(v)} \\
+array            & \texttt{ArrayPtr} = \texttt{shared\_ptr<MusilArray>} & \texttt{std::get<ArrayPtr>(v)} \\
 proc             & \texttt{ProcVal} = \texttt{shared\_ptr<Proc>}    & \texttt{std::get<ProcVal>(v)} \\
 \bottomrule
 \end{tabular}
@@ -1127,7 +1127,7 @@ var total4    = reduce(positives, proc(a,x){ return a+x }, 0)
 
 \subsection*{Licensing}
 
-The Moon language is released under the BSD 2-Clause license.
+The Musil language is released under the BSD 2-Clause license.
 
 
 \end{document}
