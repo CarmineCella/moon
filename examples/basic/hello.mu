@@ -1,4 +1,6 @@
-# variables, arithmetic, comparisons
+# Hello Musil!
+
+print "Hello, Musil!"
 
 var x = 42
 var y = 3.14
