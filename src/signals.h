@@ -615,7 +615,7 @@ inline void add_signals(Environment& env) {
     env.register_builtin("vaddat",       fn_vaddat);
     env.register_builtin("dcblock",      fn_dcblock);
     env.register_builtin("reson",        fn_reson);
-    env.register_builtin("filter",       fn_filter);
+    env.register_builtin("aufilter",       fn_filter);
     env.register_builtin("filtdesign",   fn_filtdesign);
     env.register_builtin("delay",        fn_delay);
     env.register_builtin("comb",         fn_comb);

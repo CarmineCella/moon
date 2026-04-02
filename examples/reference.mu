@@ -240,28 +240,11 @@ section("8. FIRST-CLASS PROCS")
 var double3 = proc (x) { return x * 2 }
 print "double3(7) = " double3(7)
 
-# Pass to a higher-order proc
-proc map_array (a5, f) {
-    var out = []
-    for (var x in a5) { push(out, f(x)) }
-    return out
-}
-proc filter_array (a5, pred) {
-    var out = []
-    for (var x in a5) { if (pred(x)) { push(out, x) } }
-    return out
-}
-proc reduce_array (a5, f, init) {
-    var acc = init
-    for (var x in a5) { acc = f(acc, x) }
-    return acc
-}
-
 var nums = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 
-var squared   = map_array(nums, proc (x) { return x * x })
-var evens     = filter_array(nums, proc (x) { return mod(x, 2) == 0 })
-var total2    = reduce_array(nums, proc (acc, x) { return acc + x }, 0)
+var squared   = map (nums, proc (x) { return x * x })
+var evens     = filter (nums, proc (x) { return mod(x, 2) == 0 })
+var total2    = reduce (nums, proc (acc, x) { return acc + x }, 0)
 
 print "squares:  " squared
 print "evens:    " evens

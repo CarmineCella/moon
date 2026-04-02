@@ -38,7 +38,7 @@ proc design_biquad (type, Fs, f0, Q, gain_db) {
 # apply_biquad(sig, coeffs) — apply a single biquad filter
 # coeffs: packed [b0 b1 b2 1 a1 a2] as returned by design_biquad / filtdesign
 proc apply_biquad (sig, coeffs) {
-    return filter(sig, coeffs)
+    return aufilter(sig, coeffs)
 }
 
 # apply_biquad_chain2(sig, coeffs1, coeffs2) — apply two biquads in series
