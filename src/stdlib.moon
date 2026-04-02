@@ -1,5 +1,5 @@
 # ─────────────────────────────────────────────────────────────────────────────
-# moon standard library  —  stdlib.moon
+# moon standard library  —  stdlib.moon  (v2, native arrays)
 # load with:  load("stdlib.moon")
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -43,7 +43,6 @@ proc round_to (x, decimals) {
     return floor(x * factor + 0.5) / factor
 }
 
-# integer mod (works correctly for positive and negative)
 proc mod (a, b) {
     return a - floor(a / b) * b
 }
@@ -51,7 +50,6 @@ proc mod (a, b) {
 proc even (n) { return mod(n, 2) == 0 }
 proc odd  (n) { return mod(n, 2) != 0 }
 
-# greatest common divisor (repeated subtraction, integers only)
 proc gcd (a, b) {
     a = abs(a)
     b = abs(b)
@@ -66,19 +64,16 @@ proc lcm (a, b) {
     return (a / gcd(a, b)) * b
 }
 
-# integer power
 proc ipow (base, exp) {
     var r = 1
     while (exp > 0) { r = r * base   exp = exp - 1 }
     return r
 }
 
-# linear interpolation
 proc lerp (a, b, t) {
     return a + (b - a) * t
 }
 
-# map x from [in_lo, in_hi] into [out_lo, out_hi]
 proc map_range (x, in_lo, in_hi, out_lo, out_hi) {
     return out_lo + (x - in_lo) * (out_hi - out_lo) / (in_hi - in_lo)
 }
@@ -88,7 +83,6 @@ proc rad2deg (r) { return r * 180 / PI }
 
 # ── Number formatting ─────────────────────────────────────────────────────────
 
-# pad string s on left to width w using character ch
 proc pad_left (s, w, ch) {
     while (len(s) < w) { s = ch + s }
     return s
@@ -99,7 +93,6 @@ proc pad_right (s, w, ch) {
     return s
 }
 
-# format number with fixed decimal places
 proc fmt_fixed (x, decimals) {
     var neg = x < 0
     x = abs(x)
@@ -152,7 +145,6 @@ proc repeat_str (s, n) {
     return out
 }
 
-# count non-overlapping occurrences of pattern in s
 proc count_str (s, pattern) {
     var count = 0
     var pos = 0
@@ -166,11 +158,9 @@ proc count_str (s, pattern) {
     return count
 }
 
-# replace all occurrences of old_s with new_s
 proc replace (s, old_s, new_s) {
     var result = ""
     var olen = len(old_s)
-    var slen = len(s)
     while (len(s) > 0) {
         var idx = find(s, old_s)
         if (idx < 0) {
@@ -184,169 +174,65 @@ proc replace (s, old_s, new_s) {
     return result
 }
 
-# ── Encoded arrays ────────────────────────────────────────────────────────────
-#
-#  Arrays are strings where each element is separated by ASCII unit-separator
-#  (character 31, written as a multi-char sentinel).  Values must not contain
-#  the sentinel.  Use arr_push, arr_get, arr_set, arr_len, arr_slice.
-#
-#  Example:
-#      var a = arr_make()
-#      a = arr_push(a, 10)
-#      a = arr_push(a, 20)
-#      print arr_get(a, 0)        # "10"
-#      print arr_len(a)           # 2
-
-var _SEP = "|~|"   # sentinel unlikely to appear in user data
-
-proc arr_make () { return "" }
-
-proc arr_push (a, val) { return a + str(val) + _SEP }
-
-proc arr_len (a) {
-    if (len(a) == 0) { return 0 }
-    return count_str(a, _SEP)
-}
-
-proc arr_get (a, i) {
-    var pos = 0
-    var cur = 0
-    var slen = len(_SEP)
-    while (cur < i) {
-        var idx = find(sub(a, pos, len(a)), _SEP)
-        if (idx < 0) { return "" }
-        pos = pos + idx + slen
-        cur = cur + 1
-    }
-    var rest = sub(a, pos, len(a))
-    var end = find(rest, _SEP)
-    if (end < 0) { return rest }
-    return sub(rest, 0, end)
-}
-
-# rebuild array with element i replaced by val
-proc arr_set (a, i, val) {
-    var n = arr_len(a)
-    var out = arr_make()
-    var j = 0
-    while (j < n) {
-        if (j == i) { out = arr_push(out, val) }
-        else        { out = arr_push(out, arr_get(a, j)) }
-        j = j + 1
-    }
-    return out
-}
-
-proc arr_slice (a, lo, hi) {
-    var out = arr_make()
-    var i = lo
-    while (i < hi) { out = arr_push(out, arr_get(a, i))   i = i + 1 }
-    return out
-}
-
-# split string s on delimiter, returns encoded array
-proc split (s, delim) {
-    var arr = arr_make()
-    var dlen = len(delim)
-    while (1) {
-        var idx = find(s, delim)
-        if (idx < 0) {
-            arr = arr_push(arr, s)
-            break
-        }
-        arr = arr_push(arr, sub(s, 0, idx))
-        s = sub(s, idx + dlen, len(s))
-    }
-    return arr
-}
-
-# join encoded array into string with separator
-proc join (a, delim) {
-    var n = arr_len(a)
-    var out = ""
-    var i = 0
-    while (i < n) {
-        if (i > 0) { out = out + delim }
-        out = out + arr_get(a, i)
-        i = i + 1
-    }
-    return out
-}
-
-# ── Numeric array operations ──────────────────────────────────────────────────
+# ── Array operations ──────────────────────────────────────────────────────────
+# All operate on native arrays (the [] type).
+# Builtins already provided: len, push, pop, insert, remove,
+#                            slice, concat, copy, range, join, split,
+#                            arr (constructor).
 
 proc arr_sum (a) {
-    var n = arr_len(a)
     var s = 0
-    var i = 0
-    while (i < n) { s = s + num(arr_get(a, i))   i = i + 1 }
+    for (var x in a) { s = s + x }
     return s
 }
 
-proc arr_mean (a) {
-    var n = arr_len(a)
-    if (n == 0) { return 0 }
-    return arr_sum(a) / n
+proc arr_max (a) {
+    var m = a[0]
+    for (var x in a) { if (x > m) { m = x } }
+    return m
 }
 
 proc arr_min (a) {
-    var n = arr_len(a)
-    if (n == 0) { return 0 }
-    var m = num(arr_get(a, 0))
-    var i = 1
-    while (i < n) { m = min(m, num(arr_get(a, i)))   i = i + 1 }
+    var m = a[0]
+    for (var x in a) { if (x < m) { m = x } }
     return m
 }
 
-proc arr_max (a) {
-    var n = arr_len(a)
-    if (n == 0) { return 0 }
-    var m = num(arr_get(a, 0))
-    var i = 1
-    while (i < n) { m = max(m, num(arr_get(a, i)))   i = i + 1 }
-    return m
-}
-
-# population standard deviation
-proc arr_std (a) {
-    var n = arr_len(a)
-    if (n == 0) { return 0 }
-    var mean = arr_mean(a)
-    var sum_sq = 0
-    var i = 0
-    while (i < n) {
-        var d = num(arr_get(a, i)) - mean
-        sum_sq = sum_sq + d * d
-        i = i + 1
+proc arr_reverse (a) {
+    a = copy(a)
+    var lo = 0
+    var hi = len(a) - 1
+    while (lo < hi) {
+        var tmp = a[lo]
+        a[lo] = a[hi]
+        a[hi] = tmp
+        lo = lo + 1
+        hi = hi - 1
     }
-    return sqrt(sum_sq / n)
+    return a
 }
 
-# numeric bubble sort, ascending
+proc arr_contains (a, val) {
+    for (var x in a) { if (x == val) { return 1 } }
+    return 0
+}
+
 proc arr_sort (a) {
-    var n = arr_len(a)
+    a = copy(a)
+    var n = len(a)
     var i = 0
     while (i < n - 1) {
         var j = 0
         while (j < n - i - 1) {
-            var x = num(arr_get(a, j))
-            var y = num(arr_get(a, j + 1))
-            if (x > y) {
-                a = arr_set(a, j,     str(y))
-                a = arr_set(a, j + 1, str(x))
+            if (a[j] > a[j+1]) {
+                var tmp = a[j]
+                a[j] = a[j+1]
+                a[j+1] = tmp
             }
             j = j + 1
         }
         i = i + 1
     }
-    return a
-}
-
-# build a numeric range [lo, hi) with given step
-proc arr_range (lo, hi, step) {
-    var a = arr_make()
-    var x = lo
-    while (x < hi) { a = arr_push(a, x)   x = x + step }
     return a
 }
 
