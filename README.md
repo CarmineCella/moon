@@ -1,51 +1,45 @@
-# Moonil  
+# Musil  
 
 *A Scripting Language for Sound And Music Computing*
 
-**Moonil** (pron. moo-neel) is a tiny and expressive language designed to be easy to use, easy to expand and easy to embed in host applications.
+**Musil* is a tiny and expressive language designed to be easy to use, easy to expand and easy to embed in host applications.
 
-The core of the language is made of a single [C++ header](src/moonil.h) and a [standard library](src/stdlib.moon).
-A more or less comprehensive overview of the language can be found [here](examples/reference.moon) and version-specific documentation can be found in [docs](docs).
+The core of the language is made of a single [C++ header](src/musil.h) and a [standard library](src/stdlib.mu).
+A more or less comprehensive overview of the language can be found [here](examples/reference.mu) and version-specific documentation can be found in [docs](docs).
 
-**Moonil** is a tool for people who cross boundaries; for musicians who code, coders who compose, and thinkers who move fluidly between algorithms and aesthetics.
+**Musil** is a tool for people who cross boundaries; for musicians who code, coders who compose, and thinkers who move fluidly between algorithms and aesthetics.
 
-For an example on how to integrate the language in your application, please check the [command line interpreter](src/moonil.cpp).
+For an example on how to integrate the language in your application, please check the [command line interpreter](src/musil.cpp).
 
-# Why the name *Moonil*?
+# Why the name *Musil*?
 
-The name **Moonil** reflects both poetic inspiration and technical lineage. **Moonil** stands for:
+The language is named after **Robert Musil**, the Austrian engineer-philosopher-novelist who believed that authentic creativity emerges from the interplay of **rational precision** and **subjective intuition**.
 
-> **Music-Oriented Numeric Interpreted Language**
+In *The Man Without Qualities*, Musil describes the human condition as a fusion of:
 
-This reflects the core design of the language:
-- **Music-oriented**: conceived as a tool for sound, structure, and compositional thinking  
-- **Numeric**: built around vectors, arrays, and numerical transformations  
-- **Interpreted**: lightweight, immediate, and interactive  
+> *“Präzision und Seele”*  
+> *precision and soul*
 
-It draws inspiration from a line in *Finnegans Wake* by James Joyce:
+This duality mirrors the purpose of the Musil language:
 
-> *When the moon of mourning is set and gone.*
-> *Over Glinaduna.*
-> *Lonu nula.*
-> *Ourselves, oursouls alone.*
-> *At the site of salvocean.*
-> *And watch would the letter you’re wanting be coming may be.*
-> *And cast ashore.*
+- a core of **exact signal operations**,  
+- expressed in a syntax designed for **open exploration**,  
+- allowing composition as a form of thought.
 
-This image resonates with transformation, cycles, and emergence — ideas that align closely with the language’s focus on evolving numeric and musical processes.
+To call this language **Musil** is to acknowledge an intellectual lineage where  
+mathematics, sound, and imagination are not separate disciplines but different faces of the same creative activity.
 
 ## Lineage
 
-*Moonil* sits within a family of small, expressive languages, combining influences from both scripting and functional traditions.
+*Musil* sits within a family of small, expressive languages, combining influences from both scripting and functional traditions.
 
-It retains the **“moon”** reference, echoing lightweight languages such as Lua and MoonScript, emphasizing simplicity, embeddability, and flexibility. At the same time, **Moonil** is strongly inspired by: Lisp and Scheme. From these traditions, **Moonil** inherits:
+It is strongly inspired by TCL, Lisp and Scheme. From these traditions, **Musil** inherits:
 
 - first-class procedures
 - dynamic evaluation mechanisms such as `eval` and `apply`  
 - a minimal, compositional core  
 
-These influences shape **Moonil** as a language where programs can be constructed, transformed, and executed as data — enabling flexible and expressive workflows.
-
+These influences shape **Musil** as a language where programs can be constructed, transformed, and executed as data — enabling flexible and expressive workflows.
 
 # Building
 
@@ -61,6 +55,6 @@ To compile, from *root* folder type:
 
 # Licensing
 
-The **Moonil** language is released under the [BSD 2-Clause license](LICENSE.md).
+The **Musil** language is released under the [BSD 2-Clause license](LICENSE.md).
 
 (c) 2026 by Carmine-Emanuele Cella

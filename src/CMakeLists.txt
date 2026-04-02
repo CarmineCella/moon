@@ -1,24 +1,24 @@
 # cli/CMakeLists.txt
 #
-# Command-line Moon interpreter.
+# Command-line Musil interpreter.
 
-add_executable(moonil
-    moonil.cpp moonil.h
+add_executable(musil
+    musil.cpp musil.h
 )
 
 # Include the core headers
-target_include_directories(moonil
+target_include_directories(musil
     PRIVATE
         ${CMAKE_SOURCE_DIR}/src
 )
 
 # C++ standard and warnings/optimizations (per-target, not global)
-target_compile_features(moonil PRIVATE cxx_std_17)
+target_compile_features(musil PRIVATE cxx_std_17)
 
 if (MSVC)
-    target_compile_options(moonil PRIVATE /W4)
+    target_compile_options(musil PRIVATE /W4)
 else()
-    target_compile_options(moonil PRIVATE
+    target_compile_options(musil PRIVATE
         -Wall
         -g
         -O2
@@ -31,19 +31,19 @@ endif()
 # Installation
 #
 # 1) Install the executable under "bin" in the install prefix.
-# 2) Install .moonil files into $HOME/.moonil
+# 2) Install .musil files into $HOME/.musil
 #    and, on Unix, chown them back to the invoking user if run via sudo.
 #
 
 # Install CLI binary under ${CMAKE_INSTALL_PREFIX}/bin
-install(TARGETS moonil
+install(TARGETS musil
     RUNTIME DESTINATION bin
 )
 
-# Install .scm files into ~/.moonil
+# Install .scm files into ~/.musil
 install(FILES
-    ${CMAKE_SOURCE_DIR}/src/stdlib.moonil
-    DESTINATION $ENV{HOME}/.moonil
+    ${CMAKE_SOURCE_DIR}/src/stdlib.musil
+    DESTINATION $ENV{HOME}/.musil
 )
 
 # On Unix: if install is run with sudo, chown the .scm files to $SUDO_USER
@@ -51,23 +51,23 @@ install(FILES
 install(CODE "
     if(NOT WIN32)
       # HOME at install time (under sudo this is usually the original user's HOME)
-      set(MOONIL_HOME \"$ENV{HOME}\")
+      set(MUSIL_HOME \"$ENV{HOME}\")
 
       # Determine the owner we want: prefer SUDO_USER if present
       if(DEFINED ENV{SUDO_USER} AND NOT \"\$ENV{SUDO_USER}\" STREQUAL \"\")
-        set(MOONIL_OWNER \"\$ENV{SUDO_USER}\")
+        set(MUSIL_OWNER \"\$ENV{SUDO_USER}\")
       else()
         execute_process(
           COMMAND whoami
-          OUTPUT_VARIABLE MOONIL_OWNER
+          OUTPUT_VARIABLE MUSIL_OWNER
           OUTPUT_STRIP_TRAILING_WHITESPACE
         )
       endif()
         
-      file(GLOB scm_files \"\${MOONIL_HOME}/.moonil/*.moonil\")
+      file(GLOB scm_files \"\${MUSIL_HOME}/.musil/*.musil\")
       foreach(f \${scm_files})
         execute_process(
-          COMMAND chown \${MOONIL_OWNER} \"\${f}\"
+          COMMAND chown \${MUSIL_OWNER} \"\${f}\"
         )
       endforeach()
     endif()

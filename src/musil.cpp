@@ -1,7 +1,7 @@
-// moonil.cpp — a tiny interpreter
+// musil.cpp
 //
 
-#include "moonil.h"
+#include "musil.h"
 
 #include <iostream>
 #include <fstream>
@@ -15,7 +15,7 @@ int main(int argc, char* argv[]) {
     std::srand(time (NULL));
     Environment state;
     if (argc == 1) {
-        cout << "[moonil, v" << VERSION << "]" << endl << endl;
+        cout << "[musil, v" << VERSION << "]" << endl << endl;
         cout << "(c) 2026 by Carmine-Emanuele Cella" << endl << endl;
         repl(state);
         return 0;
