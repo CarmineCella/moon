@@ -3,7 +3,7 @@
 # Command-line Musil interpreter.
 
 add_executable(musil
-    musil.cpp musil.h
+    musil.cpp ../src/musil.h
 )
 
 # Include the core headers

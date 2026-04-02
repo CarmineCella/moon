@@ -8,7 +8,7 @@ add_compile_definitions(COPYRIGHT="2026")
 
 
 # Subdirectories
-add_subdirectory(src)
+add_subdirectory(cli)
 
 # ------------------------------------------------------------------------------
 # Uninstall target
