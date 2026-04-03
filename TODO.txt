@@ -3,7 +3,6 @@ Musil - TODO list
 -----------------
 
 v0.6
-- error messages use wrong file name when files are nested
 - add yield function for IDE + stop function
 - add paths for IDE
 - graphic plots for IDE
@@ -13,3 +12,8 @@ v0.6
 
 v0.5
 - first public release *
+
+
+BUGS
+
+- error messages use wrong file name when files are nested *

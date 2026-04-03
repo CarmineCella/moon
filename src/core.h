@@ -127,9 +127,14 @@ std::vector<Token> lex(const std::string& src, const std::string& filename = "<s
 
 struct ReturnSignal { Value val; };
 struct BreakSignal  {};
+// struct Proc {
+//     std::vector<std::string> params;
+//     std::vector<Token>       body;
+// };
 struct Proc {
     std::vector<std::string> params;
     std::vector<Token>       body;
+    std::string              def_file;
 };
 
 std::string to_str(const Value& v) {
@@ -192,6 +197,7 @@ static const NumVal& nvec(const Value& v, const std::string& ctx) {
 
 struct Interpreter;
 using Builtin = std::function<Value(std::vector<Value>&, Interpreter&)>;
+using YieldFn = std::function<void()>;
 struct Interpreter {
     std::vector<Token>              T;
     size_t                          pos = 0;
@@ -200,10 +206,12 @@ struct Interpreter {
     std::map<std::string, Proc>&    procs;
     std::map<std::string, Builtin>& builtins;
     std::function<void(const std::string&, const std::string&)> load_fn;
+    YieldFn                         yield_fn;
     bool in_proc = false;
     std::string filename;
     std::vector<std::string>& call_stack;   // shared across all sub-interpreters
 
+    void maybe_yield() { if (yield_fn) yield_fn();  }
     Token consume()    { return T[pos++]; }
     bool  check(TK t)  { return T[pos].type == t; }
     bool  match(TK t)  { if (check(t)) { pos++; return true; } return false; }
@@ -293,8 +301,16 @@ struct Interpreter {
         return r;
     }
 
-    void run() { while (!check(END)) stmt(); }
+    // void run() { while (!check(END)) stmt(); }
+    void run() {
+        while (!check(END)) {
+            maybe_yield();
+            stmt();
+        }
+    }
     void stmt() {
+        maybe_yield();
+    // void stmt() {
         if (check(VAR)) {
             consume(); std::string n = expect(IDENT).val; expect(ASSIGN); decl_var(n, expr());
         }
@@ -369,7 +385,8 @@ struct Interpreter {
             body.push_back(consume());
         }
         body.push_back({END, ""});
-        procs[name] = {params, std::move(body)};
+        // procs[name] = {params, std::move(body)};
+        procs[name] = {params, std::move(body), filename};
     }
     void run_block() {
         expect(LBRACE);
@@ -411,6 +428,7 @@ struct Interpreter {
     void while_stmt() {
         consume(); size_t cond = pos;
         while (true) {
+            maybe_yield();
             pos = cond;
             expect(LPAREN); bool c = to_bool(expr()) != 0.0; expect(RPAREN);
             if (!c) { skip_block(); break; }
@@ -424,6 +442,7 @@ struct Interpreter {
         size_t body_start = pos;
 
         auto run_body_with = [&](Value v) {
+            maybe_yield();
             pos = body_start; decl_var(var_name, std::move(v));
             try { run_block(); } catch (BreakSignal&) { throw; }
         };
@@ -474,7 +493,9 @@ struct Interpreter {
             throw make_err("arity mismatch calling '" + name + "': expected "
                            + std::to_string(p.params.size()) + " args");
         call_stack.push_back(name);
-        Interpreter sub{p.body, 0, globals, {}, procs, builtins, load_fn, true, filename, call_stack};
+        // Interpreter sub{p.body, 0, globals, {}, procs, builtins, load_fn, true, filename, call_stack};
+        // Interpreter sub{p.body, 0, globals, {}, procs, builtins, load_fn, true, p.def_file, call_stack};
+        Interpreter sub{p.body, 0, globals, {}, procs, builtins, load_fn, yield_fn, true, p.def_file, call_stack};
         for (size_t i = 0; i < args.size(); i++) sub.locals[p.params[i]] = args[i];
         Value result{NumVal{0.0}};
         try {
@@ -492,7 +513,9 @@ struct Interpreter {
         if (args.size() != pv->params.size())
             throw make_err("arity mismatch: expected " + std::to_string(pv->params.size()) + " args");
         call_stack.push_back(label);
-        Interpreter sub{pv->body, 0, globals, {}, procs, builtins, load_fn, true, filename, call_stack};
+        // Interpreter sub{pv->body, 0, globals, {}, procs, builtins, load_fn, true, filename, call_stack};
+        // Interpreter sub{pv->body, 0, globals, {}, procs, builtins, load_fn, true, pv->def_file, call_stack};
+        Interpreter sub{pv->body, 0, globals, {}, procs, builtins, load_fn, yield_fn, true, pv->def_file, call_stack};
         for (size_t i = 0; i < args.size(); i++) sub.locals[pv->params[i]] = args[i];
         Value result{NumVal{0.0}};
         try {
@@ -806,7 +829,11 @@ struct Interpreter {
         throw make_err("undefined '" + nm + "'");
     }
 
-    Value expr()     { return or_expr(); }
+    // Value expr()     { return or_expr(); }
+    Value expr() {
+        maybe_yield();
+        return or_expr();
+    }    
     Value or_expr()  {
         Value l = and_expr();
         while (check(OR)) { consume(); Value r = and_expr(); l = NumVal{(to_bool(l)||to_bool(r)) ? 1.0 : 0.0}; }
@@ -924,7 +951,8 @@ struct Interpreter {
                 body.push_back(consume());
             }
             body.push_back({END, ""});
-            return std::make_shared<Proc>(Proc{std::move(params), std::move(body)});
+            // return std::make_shared<Proc>(Proc{std::move(params), std::move(body)});
+            return std::make_shared<Proc>(Proc{std::move(params), std::move(body), filename});
         }
 
         // array literal: [expr, expr, ...]
@@ -977,10 +1005,15 @@ struct Environment {
     void register_builtin(const std::string& name, Builtin fn) {
         builtins[name] = std::move(fn);
     }
+    void set_yield(YieldFn fn) {
+        yield_fn = std::move(fn);
+    }    
     void exec(const std::string& src, const std::string& filename = "<stdin>") {
         auto toks = lex(src, filename);
+        // Interpreter interp{std::move(toks), 0, globals, {}, procs, builtins,
+        //                    {}, false, filename, call_stack};
         Interpreter interp{std::move(toks), 0, globals, {}, procs, builtins,
-                           {}, false, filename, call_stack};
+                           {}, yield_fn, false, filename, call_stack};                           
         interp.load_fn = [this](const std::string& s, const std::string& f){ this->exec(s, f); };
         interp.run();
     }
@@ -990,6 +1023,7 @@ struct Environment {
     std::map<std::string, Builtin> builtins;
     std::vector<std::string>       call_stack;    
     std::vector<std::string>       paths;
+    YieldFn                         yield_fn;    
 };
 std::string format_error(const Error& e) {
     std::string msg = e.file + ":" + std::to_string(e.line) + ": " + e.msg;

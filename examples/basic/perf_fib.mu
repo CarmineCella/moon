@@ -10,3 +10,6 @@ proc fib (n) {
 }
 print "fib(20) = " fib(20)
 print "fib(25) = " fib(25)
+
+
+for (var i in range (10, 30)) { print fib (i) }

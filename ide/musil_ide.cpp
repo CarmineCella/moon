@@ -1,8 +1,8 @@
 // musil_ide.cpp — Musil IDE  (adapted for core.h v0.5)
 //
 // Threading: evaluation runs on a detached worker thread.
-// Yield: not yet implemented — stop button signals the thread but cannot
-//        interrupt a running exec() call mid-way. Will be fixed later.
+// Yield: implemented through Environment::set_yield(). The worker thread
+// periodically pumps redirected console output and checks for stop requests.
 
 #include <FL/Fl.H>
 #ifdef __APPLE__
@@ -79,6 +79,7 @@ Fl_Text_Display   *app_console        = nullptr;
 Fl_Text_Buffer    *app_console_buffer = nullptr;
 
 class ListenerInput;
+struct CoutRedirect;
 ListenerInput     *app_listener       = nullptr;
 
 Fl_Select_Browser *app_var_browser    = nullptr;
@@ -118,6 +119,10 @@ std::atomic<bool>   g_eval_stop_requested{false};
 std::atomic<bool>   g_keywords_need_update{false};
 std::mutex          g_console_mutex;
 std::queue<std::string> g_console_queue;
+
+// Active stdout redirect for the current evaluation thread.
+// Used by musil_ide_yield(), which always runs on the worker thread.
+static thread_local CoutRedirect* g_active_redirect = nullptr;
 
 std::string g_exe_dir;
 
@@ -197,6 +202,22 @@ struct CoutRedirect {
         return s;
     }
 };
+
+// Called periodically from the interpreter on the worker thread.
+// - flushes redirected stdout to the GUI console
+// - aborts evaluation quickly when Stop was requested
+static void musil_ide_yield() {
+    if (g_eval_stop_requested) {
+        throw std::runtime_error("Evaluation stopped by user");
+    }
+
+    if (!g_active_redirect) return;
+
+    std::string chunk = g_active_redirect->consume();
+    if (!chunk.empty()) {
+        console_append_threadsafe(chunk);
+    }
+}
 
 // ── Title / filename tracking ─────────────────────────────────────────────────
 
@@ -492,6 +513,9 @@ void init_musil_env() {
             if (I.load_fn) I.load_fn(src, resolved);
             return NumVal{0.0};
         });
+
+    // Install IDE yield callback so Stop and console flushing work during evaluation.
+    musil_env.set_yield(musil_ide_yield);
 
     // Restore saved paths
     load_env_paths();
@@ -982,18 +1006,20 @@ void listener_eval_line() {
 //
 // eval_code_worker runs on a detached thread.
 // It redirects stdout and calls musil_env.exec(code, filename).
-// NOTE: without a yield hook, Stop can only interrupt *between* top-level
-//       statements in the future; for now it has no effect on a running exec().
+// Stop requests are handled through musil_ide_yield(), which is called
+// from the interpreter at safe points during evaluation.
 
 void eval_code_worker(const std::string code, bool is_script) {
     struct EvalGuard {
         ~EvalGuard() {
+            g_active_redirect      = nullptr;
             g_eval_running         = false;
             g_keywords_need_update = true;
         }
     } guard;
 
     CoutRedirect redirect;
+    g_active_redirect = &redirect;
 
     // Determine filename for error messages
     std::string fname = app_filename[0] ? std::string(app_filename) : "<listener>";
@@ -1019,6 +1045,8 @@ void eval_code_worker(const std::string code, bool is_script) {
     // Flush any remaining captured output
     std::string output = redirect.consume();
     if (!output.empty()) console_append_threadsafe(output);
+
+    g_active_redirect = nullptr;
 }
 
 void eval_code(const std::string &code, bool is_script) {
