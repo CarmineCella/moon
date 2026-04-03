@@ -1548,6 +1548,7 @@ void build_main_editor_console_listener() {
 
     app_text_buffer = new Fl_Text_Buffer();
     app_text_buffer->add_modify_callback(text_changed_callback, nullptr);
+    app_text_buffer->tab_distance(4);   // <- tab width = 4 columns    
 
     // Toolbar
     Fl_Group* toolbar = new Fl_Group(0, menu_h, win_w, toolbar_h);
