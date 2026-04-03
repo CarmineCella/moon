@@ -13,10 +13,10 @@ if(NOT FLTK_FOUND)
 endif()
 
 # Paths to scheme files
-set(MUSIL_STDLIB "${CMAKE_SOURCE_DIR}/src/stdlib.scm")
-set(MUSIL_SCI   "${CMAKE_SOURCE_DIR}/src/scientific.scm")
-set(MUSIL_PLOT   "${CMAKE_SOURCE_DIR}/src/plotting.scm")
-set(MUSIL_SIG   "${CMAKE_SOURCE_DIR}/src/signals.scm")
+set(MUSIL_STDLIB "${CMAKE_SOURCE_DIR}/src/stdlib.mu")
+set(MUSIL_SCI   "${CMAKE_SOURCE_DIR}/src/scientific.mu")
+set(MUSIL_PLOT   "${CMAKE_SOURCE_DIR}/src/plotting.mu")
+set(MUSIL_SIG   "${CMAKE_SOURCE_DIR}/src/signals.mu")
 
 # musil.icns is in the same folder as musil_ide.cpp
 set(MUSIL_ICON_FILE "${CMAKE_CURRENT_SOURCE_DIR}/musil.icns")

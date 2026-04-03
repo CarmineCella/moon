@@ -179,6 +179,16 @@ bool values_equal(const Value& a, const Value& b) {
         return std::get<ProcVal>(a) == std::get<ProcVal>(b);
     return std::get<ArrayPtr>(a) == std::get<ArrayPtr>(b);
 }
+static double scalar(const Value& v, const std::string& ctx) {
+    if (!std::holds_alternative<NumVal>(v))
+        throw Error{"scientific", -1, ctx + ": expected number"};
+    return std::get<NumVal>(v)[0];
+}
+static const NumVal& nvec(const Value& v, const std::string& ctx) {
+    if (!std::holds_alternative<NumVal>(v))
+        throw Error{"scientific", -1, ctx + ": expected numeric vector"};
+    return std::get<NumVal>(v);
+}
 
 struct Interpreter;
 using Builtin = std::function<Value(std::vector<Value>&, Interpreter&)>;
@@ -722,6 +732,8 @@ struct Interpreter {
             chk(0);
             auto r = std::make_shared<Array>();
             for (auto& [k, _] : globals) r->elems.push_back(k);
+            for (auto& [k, _] : procs) r->elems.push_back(k);
+            for (auto& [k, _] : builtins) r->elems.push_back(k);
             return r;
         }
 

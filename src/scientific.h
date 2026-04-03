@@ -72,20 +72,6 @@ static Value matrix2arr(const Matrix<double>& m) {
     return arr;
 }
 
-// Convenience: extract scalar from a NumVal argument
-static double scalar(const Value& v, const std::string& ctx) {
-    if (!std::holds_alternative<NumVal>(v))
-        throw Error{"scientific", -1, ctx + ": expected number"};
-    return std::get<NumVal>(v)[0];
-}
-
-// Convenience: extract NumVal from a Value argument
-static const NumVal& nvec(const Value& v, const std::string& ctx) {
-    if (!std::holds_alternative<NumVal>(v))
-        throw Error{"scientific", -1, ctx + ": expected numeric vector"};
-    return std::get<NumVal>(v);
-}
-
 // ── Display ───────────────────────────────────────────────────────────────────
 
 static Value fn_matdisp(std::vector<Value>& args, Interpreter& interp) {

@@ -1,5 +1,9 @@
 # performance test: Fibonacci numbers
 
+load ("stdlib.mu")
+
+load ("scientific.mu")
+
 proc fib (n) {
     while (n <= 1) { return n }
     return fib(n - 1) + fib(n - 2)

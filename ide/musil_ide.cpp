@@ -56,13 +56,7 @@
 #endif
 
 // ── Musil core + libraries ────────────────────────────────────────────────────
-// Adjust includes to match your project layout.
-#include "core.h"
-// Uncomment libraries you have compiled:
-// #include "signals.h"
-// #include "scientific.h"
-// #include "system.h"
-// #include "plotting.h"
+#include "musil.h"
 
 namespace fs = std::filesystem;
 
@@ -71,7 +65,7 @@ namespace fs = std::filesystem;
 #define VERSION "0.5"
 #endif
 #ifndef COPYRIGHT
-#define COPYRIGHT "2024 Carmine Cella"
+#define COPYRIGHT "2026 Carmine Cella"
 #endif
 
 // ── Globals ───────────────────────────────────────────────────────────────────
@@ -452,11 +446,10 @@ void init_musil_env() {
     // Reconstruct environment by assignment (resets globals/procs/builtins)
     musil_env = Environment{};
 
-    // Register libraries (uncomment what you have compiled)
-    // add_signals(musil_env);
-    // add_scientific(musil_env);
-    // add_system(musil_env);
-    // add_plotting(musil_env);
+    add_signals(musil_env);
+    add_scientific(musil_env);
+    add_system(musil_env);
+    add_plotting(musil_env);
 
     // Override the built-in `load` to also search env.paths
     musil_env.register_builtin("load",
@@ -702,8 +695,10 @@ void update_keywords_from_env_and_browser() {
     // Collect and sort each category
     std::vector<std::string> builtins_list, procs_list, globals_list;
 
-    for (const auto& kv : musil_env.builtins)
+    for (const auto& kv : musil_env.builtins) {
         builtins_list.push_back(kv.first);
+        std::cout << kv.first << std::endl;
+    }
     for (const auto& kv : musil_env.procs)
         procs_list.push_back(kv.first);
     for (const auto& kv : musil_env.globals)
@@ -1407,9 +1402,9 @@ void build_paths_dialog() {
             if (line > 0) static_cast<Fl_Select_Browser*>(w)->select(line);
         }, dlg);
 
-    new Fl_Button(10,     H - 50, 80, 30, "Add...")->callback(paths_add_cb,    dlg);
-    new Fl_Button(100,    H - 50, 80, 30, "Remove")->callback(paths_remove_cb, dlg);
-    new Fl_Button(W - 90, H - 50, 80, 30, "Close") ->callback(paths_close_cb,  dlg);
+    (new Fl_Button(10,     H - 50, 80, 30, "Add..."))->callback(paths_add_cb,    dlg);
+    (new Fl_Button(100,    H - 50, 80, 30, "Remove"))->callback(paths_remove_cb, dlg);
+    (new Fl_Button(W - 90, H - 50, 80, 30, "Close"))->callback(paths_close_cb,  dlg);
 
     dlg->win->end();
     dlg->win->show();
