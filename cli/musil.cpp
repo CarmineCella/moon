@@ -36,8 +36,8 @@ int main (int argc, char* argv[]) {
 			cout << BOLDBLUE << "[musil, version "
 				<< VERSION <<"]" << RESET << endl << endl;
 
-			cout << "music scripting language" << endl;
-			cout << "(c) " << COPYRIGHT << ", www.carminecella.com" << endl << endl;
+			cout << "scripting language for sound and music computing" << endl;
+			cout << "(c) " << COPYRIGHT << " by Carmine-Emanuele Cella" << endl << endl;
 
 			repl(interpreter);
 		} else {

@@ -9,10 +9,10 @@ v0.6
 - music library: orchestrate, mp, soundtypes, granular orchestrate, symbolic composition system (notes, midi in and out, musicxml out, algorithmic gen)
 
 v0.51
-- graphic plots for IDE
+- graphic plots for IDE *
 - add yield function for IDE + stop function *
 - add paths for IDE or find solution
-- tab size = 4
+- tab size = 4 *
 
 v0.5
 - first public release *

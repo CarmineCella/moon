@@ -522,8 +522,8 @@ void init_musil_env() {
 
     std::ostringstream out;
     out << "[Musil v" << VERSION << "]\n\n";
-    out << "music scripting language\n";
-    out << "(c) " << COPYRIGHT << "  www.carminecella.com\n\n";
+    out << "scripting language for sound and music computing\n";
+    out << "(c) " << COPYRIGHT << " by Carmine-Emanuele Cella\n";
     console_append(out.str());
 
     init_base_keywords();
@@ -722,7 +722,7 @@ void update_keywords_from_env_and_browser() {
 
     auto add_master_header = [&](const char* title) {
         std::ostringstream oss;
-        oss << "@B" << (int)FL_BLUE << "@C" << (int)FL_WHITE << " " << title;
+        oss << "@B" << (int)FL_DARK_BLUE << "@C" << (int)FL_WHITE << " " << title;
         app_var_browser->add(oss.str().c_str());
         g_browser_symbols.push_back("");  // header → non-clickable
     };
@@ -1455,9 +1455,9 @@ void var_browser_cb(Fl_Widget *w, void *) {
 void menu_about_callback(Fl_Widget*, void*) {
     std::ostringstream oss;
     oss << "Musil IDE\n\nVersion " << VERSION << "\n"
-        << "Music scripting language and IDE\n\n"
-        << "(c) " << COPYRIGHT << "\n"
-        << "www.carminecella.com";
+        << "scripting language for sound and music computing\n\n"
+        << "(c) " << COPYRIGHT << " by Carmine-Emanuele Cella\n";
+        
     fl_message("%s", oss.str().c_str());
 }
 
@@ -1646,6 +1646,7 @@ void build_main_editor_console_listener() {
 
 int main(int argc, char **argv) {
     try {
+        Fl::lock();
         Fl::scheme("oxy");
         Fl::args_to_utf8(argc, argv);
 

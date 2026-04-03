@@ -14,9 +14,9 @@ endif()
 
 # Paths to scheme files
 set(MUSIL_STDLIB "${CMAKE_SOURCE_DIR}/src/stdlib.mu")
-set(MUSIL_SCI   "${CMAKE_SOURCE_DIR}/src/scientific.mu")
+set(MUSIL_SCI    "${CMAKE_SOURCE_DIR}/src/scientific.mu")
 set(MUSIL_PLOT   "${CMAKE_SOURCE_DIR}/src/plotting.mu")
-set(MUSIL_SIG   "${CMAKE_SOURCE_DIR}/src/signals.mu")
+set(MUSIL_SIG    "${CMAKE_SOURCE_DIR}/src/signals.mu")
 
 # musil.icns is in the same folder as musil_ide.cpp
 set(MUSIL_ICON_FILE "${CMAKE_CURRENT_SOURCE_DIR}/musil.icns")
@@ -40,7 +40,7 @@ if(APPLE)
         MACOSX_BUNDLE_INFO_STRING          "Musil IDE"
         MACOSX_BUNDLE_BUNDLE_VERSION       "0.1"
         MACOSX_BUNDLE_SHORT_VERSION_STRING "0.1"
-        MACOSX_BUNDLE_ICON_FILE            "musil.icns"   # filename only
+        MACOSX_BUNDLE_ICON_FILE            "musil.icns"
     )
 
     # Copy libraries into the bundle Resources after build
@@ -56,10 +56,10 @@ if(APPLE)
             "${MUSIL_RESOURCES_DIR}/signals.mu"
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
             "${MUSIL_SCI}"
-            "${MUSIL_RESOURCES_DIR}/scientific.mu"        
-       COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${MUSIL_RESOURCES_DIR}/scientific.mu"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
             "${MUSIL_PLOT}"
-            "${MUSIL_RESOURCES_DIR}/plotting.mu"                        
+            "${MUSIL_RESOURCES_DIR}/plotting.mu"
         COMMENT "Copying libraries into Musil IDE.app Resources"
     )
 
@@ -76,14 +76,13 @@ else()
             "$<TARGET_FILE_DIR:musil_ide>/stdlib.mu"
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
             "${MUSIL_SCI}"
-            "$<TARGET_FILE_DIR:musil_ide>/scientific.mu"       
-       COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "$<TARGET_FILE_DIR:musil_ide>/scientific.mu"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
             "${MUSIL_PLOT}"
-            "$<TARGET_FILE_DIR:musil_ide>/plotting.mu"                     
-       COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "$<TARGET_FILE_DIR:musil_ide>/plotting.mu"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
             "${MUSIL_SIG}"
-            "$<TARGET_FILE_DIR:musil_ide>/signals.mu"                     
-
+            "$<TARGET_FILE_DIR:musil_ide>/signals.mu"
         COMMENT "Copying libraries next to musil_ide executable"
     )
 endif()
@@ -92,6 +91,11 @@ target_include_directories(musil_ide
     PRIVATE
         ${CMAKE_SOURCE_DIR}/src
         ${FLTK_INCLUDE_DIR}
+)
+
+target_compile_definitions(musil_ide
+    PRIVATE
+        BUILD_MUSIL_IDE
 )
 
 target_compile_features(musil_ide PRIVATE cxx_std_17)
