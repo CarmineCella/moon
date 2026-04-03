@@ -1,32 +1,11 @@
-# cmake_uninstall.cmake.in
-#
-
 message(STATUS "Starting Musil uninstall...")
 
-# ------------------------------------------------------------------------------
-# 1. Remove installed files (standard CMake uninstall)
-# ------------------------------------------------------------------------------
-
-set(MANIFEST "@CMAKE_CURRENT_BINARY_DIR@/install_manifest.txt")
-
-if(NOT EXISTS "${MANIFEST}")
-    message(FATAL_ERROR "Cannot find install_manifest.txt. Have you run 'make install'?")
-endif()
-
-file(READ "${MANIFEST}" files)
-string(REGEX REPLACE "\n" ";" files "${files}")
-
-foreach(file ${files})
-    if(EXISTS "${file}" OR IS_SYMLINK "${file}")
-        message(STATUS "Removing installed file: ${file}")
-        file(REMOVE "${file}")
-    else()
-        message(STATUS "Already removed or missing: ${file}")
-    endif()
-endforeach()
+set(PREFIX "@CMAKE_INSTALL_PREFIX@")
+set(IS_APPLE "@APPLE@")
+set(MANIFEST "@CMAKE_BINARY_DIR@/install_manifest.txt")
 
 # ------------------------------------------------------------------------------
-# 2. Remove ~/.musil directory
+# 2. Remove ~/.musil
 # ------------------------------------------------------------------------------
 
 if(DEFINED ENV{HOME})
@@ -39,31 +18,11 @@ if(DEFINED ENV{HOME})
     endif()
 endif()
 
-
 # ------------------------------------------------------------------------------
-# 3. Cleanup for Linux / Windows (optional)
-#    Remove ${CMAKE_INSTALL_PREFIX}/musil or ${CMAKE_INSTALL_PREFIX}/bin/musil
+# 3. Remove Musil IDE.app from /Applications on macOS
 # ------------------------------------------------------------------------------
 
-set(PREFIX "@CMAKE_INSTALL_PREFIX@")
-
-if(EXISTS "${PREFIX}/musil")
-    message(STATUS "Removing: ${PREFIX}/musil")
-    file(REMOVE_RECURSE "${PREFIX}/musil")
-endif()
-
-if(EXISTS "${PREFIX}/bin/musil")
-    message(STATUS "Removing CLI binary directory: ${PREFIX}/bin/musil")
-    # No REMOVE_RECURSE because it may contain other binaries
-    file(REMOVE "${PREFIX}/bin/musil")
-endif()
-
-
-# ------------------------------------------------------------------------------
-# 4. Remove Musil IDE.app on macOS
-# ------------------------------------------------------------------------------
-
-if(APPLE)
+if(IS_APPLE)
     set(MUSIL_APP "/Applications/Musil IDE.app")
     if(EXISTS "${MUSIL_APP}")
         message(STATUS "Removing application bundle: ${MUSIL_APP}")
@@ -73,5 +32,18 @@ if(APPLE)
     endif()
 endif()
 
+# ------------------------------------------------------------------------------
+# 4. Optional cleanup for CLI leftovers
+# ------------------------------------------------------------------------------
+
+if(EXISTS "${PREFIX}/musil")
+    message(STATUS "Removing: ${PREFIX}/musil")
+    file(REMOVE_RECURSE "${PREFIX}/musil")
+endif()
+
+if(EXISTS "${PREFIX}/bin/musil")
+    message(STATUS "Removing CLI binary: ${PREFIX}/bin/musil")
+    file(REMOVE "${PREFIX}/bin/musil")
+endif()
 
 message(STATUS "Musil uninstall completed.")
