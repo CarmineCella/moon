@@ -127,10 +127,6 @@ std::vector<Token> lex(const std::string& src, const std::string& filename = "<s
 
 struct ReturnSignal { Value val; };
 struct BreakSignal  {};
-// struct Proc {
-//     std::vector<std::string> params;
-//     std::vector<Token>       body;
-// };
 struct Proc {
     std::vector<std::string> params;
     std::vector<Token>       body;
@@ -301,7 +297,6 @@ struct Interpreter {
         return r;
     }
 
-    // void run() { while (!check(END)) stmt(); }
     void run() {
         while (!check(END)) {
             maybe_yield();
@@ -310,7 +305,6 @@ struct Interpreter {
     }
     void stmt() {
         maybe_yield();
-    // void stmt() {
         if (check(VAR)) {
             consume(); std::string n = expect(IDENT).val; expect(ASSIGN); decl_var(n, expr());
         }
@@ -385,7 +379,6 @@ struct Interpreter {
             body.push_back(consume());
         }
         body.push_back({END, ""});
-        // procs[name] = {params, std::move(body)};
         procs[name] = {params, std::move(body), filename};
     }
     void run_block() {
@@ -493,8 +486,6 @@ struct Interpreter {
             throw make_err("arity mismatch calling '" + name + "': expected "
                            + std::to_string(p.params.size()) + " args");
         call_stack.push_back(name);
-        // Interpreter sub{p.body, 0, globals, {}, procs, builtins, load_fn, true, filename, call_stack};
-        // Interpreter sub{p.body, 0, globals, {}, procs, builtins, load_fn, true, p.def_file, call_stack};
         Interpreter sub{p.body, 0, globals, {}, procs, builtins, load_fn, yield_fn, true, p.def_file, call_stack};
         for (size_t i = 0; i < args.size(); i++) sub.locals[p.params[i]] = args[i];
         Value result{NumVal{0.0}};
@@ -513,8 +504,6 @@ struct Interpreter {
         if (args.size() != pv->params.size())
             throw make_err("arity mismatch: expected " + std::to_string(pv->params.size()) + " args");
         call_stack.push_back(label);
-        // Interpreter sub{pv->body, 0, globals, {}, procs, builtins, load_fn, true, filename, call_stack};
-        // Interpreter sub{pv->body, 0, globals, {}, procs, builtins, load_fn, true, pv->def_file, call_stack};
         Interpreter sub{pv->body, 0, globals, {}, procs, builtins, load_fn, yield_fn, true, pv->def_file, call_stack};
         for (size_t i = 0; i < args.size(); i++) sub.locals[pv->params[i]] = args[i];
         Value result{NumVal{0.0}};
@@ -829,7 +818,6 @@ struct Interpreter {
         throw make_err("undefined '" + nm + "'");
     }
 
-    // Value expr()     { return or_expr(); }
     Value expr() {
         maybe_yield();
         return or_expr();
@@ -1003,7 +991,6 @@ struct Interpreter {
                 body.push_back(consume());
             }
             body.push_back({END, ""});
-            // return std::make_shared<Proc>(Proc{std::move(params), std::move(body)});
             return std::make_shared<Proc>(Proc{std::move(params), std::move(body), filename});
         }
 

@@ -1,0 +1,1281 @@
+% ─────────────────────────────────────────────────────────────────────────────
+%  Musil v0.51 — User Manual
+% ─────────────────────────────────────────────────────────────────────────────
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[margin=2.5cm]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+
+
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{parskip}
+\usepackage{titlesec}
+\usepackage{hyperref}
+\usepackage{enumitem}
+\usepackage{fancyhdr}
+\usepackage{mdframed}
+\usepackage{amsmath}
+\usepackage{graphicx}
+
+% ── Colours ──────────────────────────────────────────────────────────────────
+\definecolor{musilblue}{RGB}{25,80,140}
+\definecolor{musilgray}{RGB}{245,245,245}
+\definecolor{musilgreen}{RGB}{0,120,60}
+\definecolor{musilred}{RGB}{160,30,30}
+\definecolor{musilpurple}{RGB}{100,0,150}
+\definecolor{musilcomment}{RGB}{100,100,100}
+
+% ── Listings setup ────────────────────────────────────────────────────────────
+\lstdefinelanguage{Musil}{
+  morekeywords={var,proc,return,if,else,while,for,in,break,and,or,not,print,load},
+  morestring=[b]",
+  morecomment=[l]{\#},
+  sensitive=true,
+}
+\lstdefinestyle{musil}{
+  language=Musil,
+  backgroundcolor=\color{musilgray},
+  basicstyle=\ttfamily\small,
+  keywordstyle=\color{musilblue}\bfseries,
+  stringstyle=\color{musilred},
+  commentstyle=\color{musilcomment}\itshape,
+  numberstyle=\tiny\color{gray},
+  numbers=left,
+  numbersep=8pt,
+  frame=single,
+  framerule=0.4pt,
+  rulecolor=\color{gray!40},
+  xleftmargin=1.5em,
+  breaklines=true,
+  showstringspaces=false,
+  tabsize=4,
+}
+\lstdefinestyle{musilinline}{
+  language=Musil,
+  basicstyle=\ttfamily,
+  keywordstyle=\color{musilblue}\bfseries,
+  stringstyle=\color{musilred},
+  commentstyle=\color{musilcomment},
+  showstringspaces=false,
+}
+\lstset{style=musil}
+
+\newcommand{\musil}[1]{\lstinline[style=musilinline]{#1}}
+
+% ── Section formatting ────────────────────────────────────────────────────────
+\titleformat{\section}{\large\bfseries\color{musilblue}}{{\thesection}}{1em}{}[\vspace{-0.3em}\rule{\linewidth}{0.5pt}]
+\titleformat{\subsection}{\normalsize\bfseries\color{musilblue!80}}{{\thesubsection}}{1em}{}
+
+% ── Note / warning boxes ──────────────────────────────────────────────────────
+\newenvironment{note}{\begin{mdframed}[backgroundcolor=blue!6,linecolor=musilblue,linewidth=0.8pt]\textbf{Note:}\ }{\end{mdframed}}
+\newenvironment{warn}{\begin{mdframed}[backgroundcolor=red!6,linecolor=musilred,linewidth=0.8pt]\textbf{Warning:}\ }{\end{mdframed}}
+
+% ── Header / footer ──────────────────────────────────────────────────────────
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\textit{Musil v0.51 User Manual}}
+\fancyhead[R]{\small\thepage}
+\renewcommand{\headrulewidth}{0.3pt}
+
+% ── Function reference macro ──────────────────────────────────────────────────
+% \fn{name}{signature}{description}
+\newcommand{\fn}[3]{%
+  \noindent\texttt{\textbf{#1}}\texttt{(#2)}\\[0.2em]
+  \hspace*{1em}#3\par\vspace{0.4em}%
+}
+
+% ── Table column types ────────────────────────────────────────────────────────
+\newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\begin{document}
+
+% ── Title ────────────────────────────────────────────────────────────────────
+\begin{titlepage}
+\centering
+\vspace*{3cm}
+\begin{center}
+    \includegraphics[width=1\textwidth]{musil_logo.png}
+\end{center}
+{\large\color{gray} User Manual \quad v0.51}\par
+\vspace{3cm}
+\rule{0.5\linewidth}{0.5pt}\par
+
+\vspace{1.5cm}
+{\normalsize
+Musil is a small, expressive scripting language designed as a control and computation
+layer for algorithmic composition, signal processing, and music technology research.
+It provides first-class numeric vectors, heterogeneous arrays, first-class procedures,
+file I/O, and a clean extension API for connecting to C++ libraries.
+}\par
+\vfill
+{\small\color{gray} (c) 2026 by Carmine-Emanuele Cella}
+\end{titlepage}
+
+\tableofcontents
+\newpage
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Overview}
+\label{sec:overview}
+% ─────────────────────────────────────────────────────────────────────────────
+
+Musil is a dynamically-typed, interpreted scripting language implemented as a
+single C++ header (\texttt{musil.h}). It is designed for use as a frontend for
+C++ tools in music technology, orchestration, and signal processing.
+
+\subsection*{Key characteristics}
+\begin{itemize}[noitemsep]
+  \item \textbf{Four value types:} number (scalar), vector (numeric array), string, array (heterogeneous), and proc (first-class function).
+  \item \textbf{Numeric vectors} are \texttt{std::valarray<double>} under the hood; all arithmetic and math functions apply element-wise with scalar broadcasting.
+  \item \textbf{Heterogeneous arrays} hold any mix of values; they have reference semantics (assignment shares the data).
+  \item \textbf{First-class procedures} can be stored in variables, passed as arguments, and stored in arrays.
+  \item \textbf{Modular:} \musil{load("file.mu")} executes another file in the current environment; the \texttt{\textasciitilde/.musil/} directory is on the search path.
+  \item \textbf{Extensible:} register C++ functions as Musil builtins with one line.
+\end{itemize}
+
+\subsection*{Building and running}
+To compile using CMake, from the \emph{root} folder type:
+\begin{lstlisting}[style=musil, numbers=none]
+mkdir build
+cd build
+cmake ..
+make
+\end{lstlisting}
+
+You can also compile the code manually, from the {src} folder, with:
+\begin{lstlisting}[style=musil, numbers=none]
+g++ -std=c++17 -O2 -o musil musil.cpp   # compile the interpreter
+\end{lstlisting}
+
+To run the interpreter, call: 
+\begin{lstlisting}[style=musil, numbers=none]
+./musil script.mu                        # run a file
+./musil lib.mu script.mu                 # run multiple files, shared state
+./musil                                  # start interactive REPL
+\end{lstlisting}
+
+Files loaded with \musil{load()} search first in the current directory, then in \texttt{\textasciitilde/.musil/}.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Types and Values}
+\label{sec:types}
+% ─────────────────────────────────────────────────────────────────────────────
+
+Musil has five types. Use \musil{type(x)} to inspect any value at runtime.
+
+\begin{center}
+\begin{tabular}{@{}llll@{}}
+\toprule
+\textbf{Type} & \texttt{type()} result & \textbf{C++ representation} & \textbf{Semantics} \\
+\midrule
+Scalar number  & \texttt{"number"}  & \texttt{valarray<double>} size 1   & value (copies on assign) \\
+Numeric vector & \texttt{"vector"}  & \texttt{valarray<double>} size $>$1 & value (copies on assign) \\
+String         & \texttt{"string"}  & \texttt{std::string}               & value (copies on assign) \\
+Array          & \texttt{"array"}   & \texttt{shared\_ptr<MusilArray>}    & reference (shares on assign) \\
+Proc           & \texttt{"proc"}    & \texttt{shared\_ptr<Proc>}         & reference (shares on assign) \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{Numbers (scalars)}
+
+Every numeric literal creates a 1-element vector, which behaves as an ordinary
+number in all arithmetic and comparisons. The internal representation is
+\texttt{std::valarray<double>}; scalar operations compile to single-element
+valarray arithmetic and are as fast as raw \texttt{double}.
+
+\begin{lstlisting}
+var x = 42
+var y = 3.14
+var z = .5          # leading dot supported
+var tiny = 1e-10    # scientific notation supported
+var big  = 6.674e-11
+\end{lstlisting}
+
+Musil has no integer type. All numbers are IEEE 754 doubles. Use
+\musil{floor}, \musil{ceil}, and \musil{mod} when integer arithmetic is needed.
+
+\subsection{Numeric vectors}
+
+A vector is a \texttt{std::valarray<double>} with more than one element. It is
+created with the \musil{vec}, \musil{linspace}, \musil{zeros}, \musil{ones}, or
+\musil{range}-to-\musil{to\_vec} functions. All arithmetic operators and all math
+builtins (\musil{sin}, \musil{cos}, \musil{sqrt}, etc.) apply element-wise.
+
+\begin{lstlisting}
+var v = vec(1, 2, 3, 4, 5)     # from individual scalars
+var w = linspace(0, 1, 5)      # 5 points evenly spaced in [0, 1]
+var z = zeros(4)               # <0 0 0 0>
+var o = ones(3)                # <1 1 1>
+
+print v + 10        # <11 12 13 14 15>   scalar broadcast
+print v * v         # <1 4 9 16 25>      element-wise
+print sin(w * PI)   # element-wise sin
+\end{lstlisting}
+
+Vectors print as \texttt{<1 2 3>} with angle brackets, distinguishing them
+from arrays which print as \texttt{[1, 2, 3]}.
+
+\textbf{Value semantics:} assigning a vector copies all its data. Mutating the
+copy does not affect the original.
+
+\begin{lstlisting}
+var a = vec(1, 2, 3)
+var b = a           # b is an independent copy
+b[0] = 99
+print a[0]          # a is unchanged
+\end{lstlisting}
+
+\subsection{Arrays}
+
+An array is a heterogeneous, mutable, ordered list of values. Elements may be
+numbers, strings, other arrays, or procs. The backing store is a
+\texttt{shared\_ptr<vector<Value>>}.
+
+\begin{lstlisting}
+var a = [1, "two", [3, 4], proc(x){ return x*2 }]
+print a[0]          # 1
+print a[1]          # two
+print a[2][1]       # 4     -- nested indexing
+print a[3](5)       # 10    -- calling a stored proc
+\end{lstlisting}
+
+\textbf{Reference semantics:} assigning an array copies the \emph{pointer}, not
+the data. Both variables refer to the same underlying list. Use \musil{copy(a)}
+to obtain an independent shallow copy.
+
+\begin{lstlisting}
+var x = [1, 2, 3]
+var y = x           # y and x share the same list
+y[0] = 99
+print x[0]          # x sees the change
+
+var z = copy(x)     # z is a new, independent copy
+z[0] = 0
+print x[0]          # x is unaffected
+\end{lstlisting}
+
+\musil{copy()} is a \emph{shallow} copy: inner arrays are still shared.
+\musil{range(lo, hi)} also produces an array (suitable for \musil{for}/\musil{in} loops).
+For numeric computation, prefer \musil{linspace} which produces a vector.
+
+\subsection{Strings}
+
+Strings are immutable. The \texttt{+} operator concatenates and coerces numbers:
+
+\begin{lstlisting}
+var s = "score: " + 99      # "score: 99"
+var t = "ha" + "ha"         # "haha"
+\end{lstlisting}
+
+Escape sequences: \texttt{\textbackslash n} (newline), \texttt{\textbackslash t}
+(tab), \texttt{\textbackslash\textbackslash} (backslash), \texttt{\textbackslash"}
+(double quote).
+
+\subsection{Procs}
+
+Procs are first-class values. A named \musil{proc} declaration stores the proc
+in the global proc table; an anonymous \musil{proc} literal creates a
+\texttt{shared\_ptr<Proc>} value.
+
+\begin{lstlisting}
+proc square (n) { return n * n }     # named proc
+
+var double = proc (x) { return x * 2 }   # anonymous, stored in variable
+print double(7)    # 14
+\end{lstlisting}
+
+\begin{note}
+Procs are \emph{not} closures. They see the global environment at call time,
+not the local variables of the scope in which they were defined.
+\end{note}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Variables and Expressions}
+\label{sec:vars}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\subsection{Variable declaration and assignment}
+
+\begin{lstlisting}
+var name = expression     # declare and initialise
+name = expression         # assign to existing variable
+\end{lstlisting}
+
+\musil{var} inside a proc creates a local variable. \musil{var} at the top level
+creates a global. Plain assignment (\musil{=} without \musil{var}) searches locals
+first, then globals; creates a new binding if not found.
+
+\subsection{Operator precedence}
+
+\begin{center}
+\begin{tabular}{@{}clc@{}}
+\toprule
+\textbf{Precedence} & \textbf{Operators} & \textbf{Associativity} \\
+\midrule
+1 (lowest) & \texttt{or}  & left \\
+2 & \texttt{and}          & left \\
+3 & \texttt{not}          & right (unary) \\
+4 & \texttt{< > <= >= == !=} & non-associative \\
+5 & \texttt{+ -}          & left \\
+6 & \texttt{* /}          & left \\
+7 & \texttt{-} (unary)    & right \\
+8 (highest) & \texttt{[i]} subscript, \texttt{()} call & left \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{Arithmetic on vectors and scalars}
+
+All arithmetic operators are element-wise on vectors. When one operand is a
+scalar (1-element vector) and the other is a multi-element vector, the scalar is
+\emph{broadcast} to match the vector size:
+
+\begin{lstlisting}
+var v = vec(1, 2, 3)
+print v + 10            # <11 12 13>    scalar broadcast
+print v * v             # <1 4 9>       element-wise
+print v + vec(10,20,30) # <11 22 33>    vector + vector
+\end{lstlisting}
+
+Mismatched sizes (neither is 1) produce a runtime error.
+
+\subsection{Comparison operators}
+
+On scalars, comparisons return \texttt{1} (true) or \texttt{0} (false).
+On vectors, comparisons are element-wise and return a \emph{mask vector} of
+0s and 1s:
+
+\begin{lstlisting}
+print 5 > 3             # 1
+print vec(1,5,3) > 2    # <0 1 1>   mask
+print all(vec(1,5,3) > 0)  # all elements > 0
+print any(vec(1,5,3) > 4)  # some elements > 4
+\end{lstlisting}
+
+Use \musil{all()} and \musil{any()} to reduce a vector mask to a scalar for
+use in \musil{if} and \musil{while} conditions.
+
+String equality uses \musil{==} and \musil{!=} only; ordering operators on strings
+produce a runtime error.
+
+\subsection{Logical operators}
+
+\musil{and}, \musil{or}, \musil{not} always return a scalar \texttt{1} or \texttt{0}.
+Truthiness: any non-zero number, any non-empty string, any non-empty array, any
+proc is truthy; zero, empty string, and empty array are falsy.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Control Flow}
+\label{sec:control}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\subsection{If / else if / else}
+
+\begin{lstlisting}
+if (condition) {
+    ...
+} else if (other_condition) {
+    ...
+} else {
+    ...
+}
+\end{lstlisting}
+
+Parentheses around the condition are required. Any number of \musil{else if}
+branches may appear; the final \musil{else} is optional.
+
+\subsection{While}
+
+\begin{lstlisting}
+while (condition) {
+    ...
+    break       # exit the loop immediately
+}
+\end{lstlisting}
+
+\musil{break} exits the innermost \musil{while} or \musil{for} loop. There is no
+\musil{continue}.
+
+\subsection{For / in}
+
+Iterates over arrays, numeric vectors, or strings:
+
+\begin{lstlisting}
+# Over an array (range returns an array)
+for (var i in range(0, 5)) {
+    print i
+}
+
+# Over a numeric vector
+for (var x in linspace(0, 1, 5)) {
+    print x
+}
+
+# Over a string (yields one character per iteration)
+for (var ch in "hello") {
+    print ch
+}
+\end{lstlisting}
+
+The loop variable is declared with \musil{var}; it is visible within the loop
+body. \musil{break} works inside \musil{for}/\musil{in}.
+
+\begin{note}
+\musil{range(lo, hi)} produces an \emph{array}, while \musil{linspace(lo, hi, n)}
+produces a \emph{vector}. Use \musil{range} for integer loops, \musil{linspace}
+for mathematical sequences.
+\end{note}
+
+\subsection{Return}
+
+\musil{return expression} exits the current proc and passes the value to the
+caller. A proc that falls off the end without \musil{return} returns \texttt{0}.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Procedures}
+\label{sec:procs}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\subsection{Named procedures}
+
+\begin{lstlisting}
+proc name (param1, param2, ...) {
+    var local = ...
+    return value
+}
+\end{lstlisting}
+
+Named procs are stored in a global proc table and are available everywhere
+after their declaration. Parameters are local variables; modifications to
+parameter \emph{vectors} do not affect the caller (value semantics).
+Modifications to parameter \emph{arrays} \emph{do} affect the caller (reference
+semantics).
+
+\subsection{Anonymous proc literals}
+
+\begin{lstlisting}
+var f = proc (x) { return x * x }
+print f(5)          # 25
+print type(f)       # proc
+\end{lstlisting}
+
+Anonymous procs can be stored in variables, passed to other procs, and stored
+in arrays. They are first-class values.
+
+\subsection{Calling procs by value}
+
+When a variable holds a proc, calling it uses the same \musil{name(args)} syntax:
+
+\begin{lstlisting}
+var transforms = [
+    proc (x) { return x + 1 },
+    proc (x) { return x * 2 }
+]
+print transforms[0](5)   # 6
+print transforms[1](5)   # 10
+\end{lstlisting}
+
+\subsection{Higher-order patterns}
+
+\begin{lstlisting}
+proc map (a, f) {
+    var out = []
+    for (var x in a) { push(out, f(x)) }
+    return out
+}
+var doubled = map([1,2,3,4], proc(x){ return x*2 })
+\end{lstlisting}
+
+The stdlib provides \musil{map}, \musil{filter}, and \musil{reduce}. The
+\musil{apply(f, args)} builtin calls a proc value or a named proc with an array
+of arguments.
+
+\subsection{Recursion}
+
+Recursive calls work normally; there is no tail-call optimisation, so very
+deep recursion will exhaust the C++ call stack.
+
+\begin{lstlisting}
+proc fib (n) {
+    if (n <= 1) { return n }
+    return fib(n-1) + fib(n-2)
+}
+\end{lstlisting}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Vectors — Numeric Arrays}
+\label{sec:vectors}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\subsection{Creation}
+
+\begin{lstlisting}
+var v = vec(1, 2, 3, 4, 5)         # from scalar arguments
+var w = linspace(0, PI, 512)       # 512 points, 0 to PI inclusive
+var z = zeros(1024)                 # 1024 zeros
+var o = ones(256)                   # 256 ones
+\end{lstlisting}
+
+\subsection{Element-wise arithmetic}
+
+\begin{lstlisting}
+var v = vec(1, 2, 3)
+print v + 10           # <11 12 13>
+print v * v            # <1 4 9>
+print -v               # <-1 -2 -3>
+print pow(v, 2)        # <1 4 9>  (element-wise power)
+\end{lstlisting}
+
+\subsection{Math functions (all element-wise)}
+
+\texttt{floor}, \texttt{ceil}, \texttt{abs}, \texttt{sqrt}, \texttt{sin},
+\texttt{cos}, \texttt{tan}, \texttt{exp}, \texttt{log}, \texttt{log2} accept
+a single vector argument. \texttt{pow(v, e)} and \texttt{atan2(y, x)} accept
+two vector arguments (with broadcast).
+
+\begin{lstlisting}
+var phase = linspace(0, TAU, 512)
+var wave  = sin(phase)             # one call, 512 sine values
+var env   = linspace(1, 0, 512)    # linear fade
+var faded = wave * env             # element-wise product
+\end{lstlisting}
+
+\subsection{Reductions}
+
+\begin{lstlisting}
+var v = vec(1, 2, 3, 4, 5)
+print sum(v)        # 15
+print all(v > 0)    # 1
+print any(v > 4)    # 1
+print len(v)        # 5
+\end{lstlisting}
+
+\subsection{Indexing}
+
+Negative indices count from the end (\texttt{-1} is the last element).
+
+\begin{lstlisting}
+var v = vec(10, 20, 30)
+print v[0]     # 10
+print v[-1]    # 30
+v[1] = 99
+print v        # <10 99 30>
+\end{lstlisting}
+
+\subsection{Iteration}
+
+\begin{lstlisting}
+var total = 0
+for (var x in vec(1, 2, 3, 4, 5)) {
+    total = total + x
+}
+\end{lstlisting}
+
+\subsection{Conversion}
+
+\musil{to\_arr(v)} converts a vector to an array of numbers. \musil{to\_vec(a)}
+converts an array of numbers to a vector (fails if any element is non-numeric).
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Arrays — Heterogeneous Lists}
+\label{sec:arrays}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\subsection{Creation}
+
+\begin{lstlisting}
+var a = [1, "two", [3, 4]]      # literal
+var b = arr(5)                   # [0, 0, 0, 0, 0]
+var c = arr(3, "x")              # ["x", "x", "x"]
+var d = range(0, 5)              # [0, 1, 2, 3, 4]
+var e = split("a,b,c", ",")      # ["a", "b", "c"]
+\end{lstlisting}
+
+\subsection{Indexing and assignment}
+
+\begin{lstlisting}
+print a[0]          # first element
+print a[-1]         # last element
+a[1] = "TWO"        # mutates in place (visible through all aliases)
+
+var matrix = [[1,2,3],[4,5,6]]
+print matrix[1][2]  # 6
+matrix[1][2] = 99   # nested assignment
+\end{lstlisting}
+
+\subsection{Mutation}
+
+All mutation functions modify the array in place. Because arrays have reference
+semantics, mutations are visible through all aliases.
+
+\begin{lstlisting}
+var a = [1, 2, 3]
+push(a, 4)           # [1, 2, 3, 4]
+push(a, 5, 6)        # variadic: [1, 2, 3, 4, 5, 6]
+var x = pop(a)       # removes and returns 6
+insert(a, 2, 99)     # insert before index 2: [1, 2, 99, 3, 4, 5]
+var r = remove(a, 0) # removes index 0, returns 1
+\end{lstlisting}
+
+\subsection{Non-mutating operations}
+
+These return new arrays; the original is unchanged.
+
+\begin{lstlisting}
+var s = slice(a, 1, 4)       # elements [1, 4)
+var c = concat(a, b)         # all elements of a then b
+var cp = copy(a)             # shallow copy
+var sh = shuffle(a)          # randomly shuffled copy
+\end{lstlisting}
+
+\subsection{Reference semantics and copy}
+
+\begin{lstlisting}
+var x = [1, 2, 3]
+var y = x               # y aliases x
+y[0] = 99
+print x[0]              # shared mutation
+
+var z = copy(x)         # break sharing
+z[0] = 0
+print x[0]              # x unaffected
+\end{lstlisting}
+
+\begin{warn}
+Arrays passed to procs are passed by reference. A proc that calls
+\musil{push}, \musil{pop}, \musil{insert}, or \musil{remove} on a parameter
+will modify the caller's array. Call \musil{copy(a)} inside the proc if you
+need a local version.
+\end{warn}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Strings}
+\label{sec:strings}
+% ─────────────────────────────────────────────────────────────────────────────
+
+Strings are immutable value types. The \texttt{+} operator concatenates;
+if either operand is a number it is converted to string first.
+
+\begin{lstlisting}
+var s = "Hello, " + "Musil!"
+var t = "score: " + 99        # "score: 99"
+print len(s)                  # 12
+print upper(s)                # "HELLO, MUSIL!"
+print sub(s, 0, 5)            # "Hello"
+print find(s, ",")            # 5
+\end{lstlisting}
+
+Strings can be iterated character by character with \musil{for}/\musil{in}.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{File I/O and Modules}
+\label{sec:io}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\subsection{File I/O}
+
+\begin{lstlisting}
+write("/tmp/out.txt", "line one\nline two\n")    # create or overwrite
+append("/tmp/out.txt", "line three\n")           # add to end
+var content = read("/tmp/out.txt")               # whole file as string
+\end{lstlisting}
+
+\subsection{Loading modules}
+
+\begin{lstlisting}
+load("stdlib.mu")          # search current dir, then ~/.musil/
+load("/abs/path/lib.mu")   # absolute path
+\end{lstlisting}
+
+All procs and variables defined in the loaded file become globally available
+in the calling environment. Files are executed sequentially; circular loads
+will loop indefinitely.
+
+\subsection{Eval and exec}
+
+\begin{lstlisting}
+eval("var x = " + str(42))   # parse and execute a string as Musil code
+eval("proc cube(n){ return n*n*n }")
+
+var rc = exec("ls -l /tmp")  # run a shell command; returns exit code
+\end{lstlisting}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Built-in Functions Reference}
+\label{sec:builtins}
+% ─────────────────────────────────────────────────────────────────────────────
+
+All built-in functions are always available without loading any library.
+Functions marked \textbf{[vec]} operate element-wise on vectors.
+Functions marked \textbf{[arr]} require an array argument.
+
+\subsection{Math}
+
+\begin{longtable}{@{}L{3.2cm}L{3.8cm}L{7.5cm}@{}}
+\toprule
+\textbf{Function} & \textbf{Signature} & \textbf{Description} \\
+\midrule
+\endhead
+\texttt{floor} [vec]   & \texttt{floor(x)}        & Largest integer $\le x$. \\
+\texttt{ceil} [vec]    & \texttt{ceil(x)}         & Smallest integer $\ge x$. \\
+\texttt{abs} [vec]     & \texttt{abs(x)}          & Absolute value. \\
+\texttt{sqrt} [vec]    & \texttt{sqrt(x)}         & Square root. \\
+\texttt{sin} [vec]     & \texttt{sin(x)}          & Sine (radians). \\
+\texttt{cos} [vec]     & \texttt{cos(x)}          & Cosine (radians). \\
+\texttt{tan} [vec]     & \texttt{tan(x)}          & Tangent (radians). \\
+\texttt{exp} [vec]     & \texttt{exp(x)}          & $e^x$. \\
+\texttt{log} [vec]     & \texttt{log(x)}          & Natural logarithm. \\
+\texttt{log2} [vec]    & \texttt{log2(x)}         & Base-2 logarithm. \\
+\texttt{pow} [vec]     & \texttt{pow(base, exp)}  & \texttt{base}$^{\texttt{exp}}$, element-wise with broadcast. \\
+\texttt{atan2} [vec]   & \texttt{atan2(y, x)}     & Four-quadrant arctangent, element-wise. \\
+\texttt{rand}          & \texttt{rand()}          & Pseudo-random number in $[0, 1)$. \\
+\bottomrule
+\end{longtable}
+
+\subsection{Vector constructors and reductions}
+
+\begin{longtable}{@{}L{3.2cm}L{4.2cm}L{7.3cm}@{}}
+\toprule
+\textbf{Function} & \textbf{Signature} & \textbf{Description} \\
+\midrule
+\endhead
+\texttt{vec}      & \texttt{vec(a, b, ...)}        & Create a vector from scalar arguments. \\
+\texttt{linspace} & \texttt{linspace(lo, hi, n)}   & $n$ evenly-spaced values in $[\texttt{lo}, \texttt{hi}]$ inclusive. \\
+\texttt{zeros}    & \texttt{zeros(n)}              & Vector of $n$ zeros. \\
+\texttt{ones}     & \texttt{ones(n)}               & Vector of $n$ ones. \\
+\texttt{sum}      & \texttt{sum(v)}                & Sum of all elements (vectors only; use \texttt{total} for arrays). \\
+\texttt{all}      & \texttt{all(v)}                & Returns 1 if every element is non-zero. \\
+\texttt{any}      & \texttt{any(v)}                & Returns 1 if any element is non-zero. \\
+\texttt{to\_arr}  & \texttt{to\_arr(v)}            & Convert vector to array of numbers. \\
+\texttt{to\_vec}  & \texttt{to\_vec(a)}            & Convert array of numbers to vector. \\
+\bottomrule
+\end{longtable}
+
+\subsection{String builtins}
+
+\begin{longtable}{@{}L{3.2cm}L{4.2cm}L{7.3cm}@{}}
+\toprule
+\textbf{Function} & \textbf{Signature} & \textbf{Description} \\
+\midrule
+\endhead
+\texttt{len}      & \texttt{len(x)}               & Length of string, array, or vector. \\
+\texttt{sub}      & \texttt{sub(s, lo, hi)}        & Substring \texttt{s[lo..hi)}. \\
+\texttt{find}     & \texttt{find(s, pattern)}      & First occurrence of \texttt{pattern} in \texttt{s}, or $-1$. \\
+\texttt{upper}    & \texttt{upper(s)}              & Uppercase copy. \\
+\texttt{lower}    & \texttt{lower(s)}              & Lowercase copy. \\
+\texttt{str}      & \texttt{str(x)}               & Convert any value to its string representation. \\
+\texttt{num}      & \texttt{num(s)}               & Parse string to number. \\
+\texttt{char}     & \texttt{char(n)}              & Character with ASCII code $n$. \\
+\texttt{asc}      & \texttt{asc(s)}               & ASCII code of first character of \texttt{s}. \\
+\texttt{split}    & \texttt{split(s, delim)}       & Split string on delimiter; returns array of strings. \\
+\bottomrule
+\end{longtable}
+
+\subsection{Array builtins}
+
+\begin{longtable}{@{}L{3.2cm}L{4.5cm}L{7cm}@{}}
+\toprule
+\textbf{Function} & \textbf{Signature} & \textbf{Description} \\
+\midrule
+\endhead
+\texttt{arr}      & \texttt{arr()}                 & Empty array. \\
+                  & \texttt{arr(n)}                & Array of $n$ zeros. \\
+                  & \texttt{arr(n, val)}           & Array of $n$ copies of \texttt{val}. \\
+\texttt{len}      & \texttt{len(a)}               & Number of elements. \\
+\texttt{push}     & \texttt{push(a, v1, v2, ...)} & Append one or more values; mutates in place. Returns \texttt{a}. \\
+\texttt{pop}      & \texttt{pop(a)}               & Remove and return last element; mutates. \\
+\texttt{insert}   & \texttt{insert(a, i, val)}    & Insert \texttt{val} before index \texttt{i}; mutates. Returns \texttt{a}. \\
+\texttt{remove}   & \texttt{remove(a, i)}         & Remove element at index \texttt{i}; mutates. Returns removed element. \\
+\texttt{slice}    & \texttt{slice(a, lo, hi)}     & New array with elements \texttt{[lo, hi)}. \\
+\texttt{concat}   & \texttt{concat(a, b)}         & New array with all elements of \texttt{a} then \texttt{b}. \\
+\texttt{copy}     & \texttt{copy(a)}              & Shallow copy; breaks reference sharing. \\
+\texttt{range}    & \texttt{range(lo, hi)}        & Array of integers $[\texttt{lo}, \texttt{hi})$. \\
+                  & \texttt{range(lo, hi, step)}  & With custom step; negative step goes downward. \\
+\texttt{shuffle}  & \texttt{shuffle(a)}           & New randomly shuffled copy. Original unchanged. \\
+\texttt{join}     & \texttt{join(a, sep)}         & Concatenate elements as strings with separator. Returns string. \\
+\texttt{keys}     & \texttt{keys()}               & Array of all current global variable names (debugging). \\
+\bottomrule
+\end{longtable}
+
+\subsection{Type and conversion}
+
+\begin{longtable}{@{}L{3.2cm}L{3.8cm}L{7.5cm}@{}}
+\toprule
+\textbf{Function} & \textbf{Signature} & \textbf{Description} \\
+\midrule
+\endhead
+\texttt{type}  & \texttt{type(x)}    & Returns \texttt{"number"}, \texttt{"vector"}, \texttt{"string"}, \texttt{"array"}, or \texttt{"proc"}. \\
+\texttt{str}   & \texttt{str(x)}    & Any value to string. Vectors print as \texttt{<1 2 3>}. \\
+\texttt{num}   & \texttt{num(s)}    & String to number. \\
+\texttt{char}  & \texttt{char(n)}   & ASCII code to single-character string. \\
+\texttt{asc}   & \texttt{asc(s)}    & First character to ASCII code. \\
+\bottomrule
+\end{longtable}
+
+\subsection{File I/O and modules}
+
+\begin{longtable}{@{}L{3.2cm}L{4.5cm}L{6.8cm}@{}}
+\toprule
+\textbf{Function} & \textbf{Signature} & \textbf{Description} \\
+\midrule
+\endhead
+\texttt{read}    & \texttt{read(path)}              & Read entire file; returns string. \\
+\texttt{write}   & \texttt{write(path, text)}       & Write string to file (create or overwrite). \\
+\texttt{append}  & \texttt{append(path, text)}      & Append string to file. \\
+\texttt{load}    & \texttt{load(path)}              & Execute \texttt{.musil} file in current environment. \\
+\texttt{eval}    & \texttt{eval(code)}              & Execute string as Musil source code. \\
+\texttt{exec}    & \texttt{exec(cmd)}               & Run shell command. Returns exit code. \\
+\bottomrule
+\end{longtable}
+
+\subsection{Higher-order and control}
+
+\begin{longtable}{@{}L{3.2cm}L{4.5cm}L{6.8cm}@{}}
+\toprule
+\textbf{Function} & \textbf{Signature} & \textbf{Description} \\
+\midrule
+\endhead
+\texttt{apply}   & \texttt{apply(f, args)}      & Call proc value \texttt{f} or proc named \texttt{f} (string) with array \texttt{args}. \\
+\texttt{input}   & \texttt{input()}             & Read one line from stdin. \\
+                 & \texttt{input(prompt)}       & Print prompt, then read one line. \\
+\texttt{clock}   & \texttt{clock()}             & CPU time in seconds (useful for benchmarking). \\
+\texttt{exit}    & \texttt{exit(code)}          & Terminate interpreter with exit code. \\
+\texttt{assert}  & \texttt{assert(cond)}        & Throw error if \texttt{cond} is falsy. \\
+                 & \texttt{assert(cond, msg)}   & Throw error with message. \\
+\bottomrule
+\end{longtable}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Libraries}
+\label{sec:stdlib}
+% ─────────────────────────────────────────────────────────────────────────────
+
+
+Musil ships with a small collection of libraries that extend the core language with I/O, signal processing, scientific computing, and plotting. At the implementation level, these libraries are defined partly as C++ builtins registered in the interpreter, and partly as higher-level Musil procedures written in \texttt{.mu} files. The builtins provide efficient access to structured data such as vectors, matrices, WAV files, and plots, while the \texttt{.mu} layer offers more convenient composite operations built on top of them. 
+
+Each library must be loaded with \musil{load("library.mu")} (the
+file must be present in the local folder, or installed in \texttt{\textasciitilde/.musil/}).
+
+\subsection{Standard library}
+
+The library is implemented in \musil{stdlib.mu}.
+
+\subsubsection{Constants}
+
+\begin{center}
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{Name} & \textbf{Value} & \textbf{Description} \\
+\midrule
+\texttt{PI}    & 3.14159265358979 & $\pi$ \\
+\texttt{TAU}   & 6.28318530717959 & $2\pi$ \\
+\texttt{E}     & 2.71828182845905 & Euler's number $e$ \\
+\texttt{PHI}   & 1.61803398874989 & Golden ratio $\varphi$ \\
+\texttt{LN2}   & 0.693147180559945 & $\ln 2$ \\
+\texttt{SQRT2} & 1.41421356237310 & $\sqrt{2}$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsubsection{Core math}
+
+\begin{longtable}{@{}L{3.5cm}L{4.5cm}L{6.5cm}@{}}
+\toprule
+\textbf{Function} & \textbf{Signature} & \textbf{Description} \\
+\midrule
+\endhead
+\texttt{min}       & \texttt{min(a, b)}                  & Smaller of two scalars. \\
+\texttt{max}       & \texttt{max(a, b)}                  & Larger of two scalars. \\
+\texttt{clamp}     & \texttt{clamp(x, lo, hi)}           & Clamp $x$ to $[\texttt{lo}, \texttt{hi}]$. Works on scalars and vectors (via broadcast). \\
+\texttt{sign}      & \texttt{sign(x)}                    & $-1$, $0$, or $1$. \\
+\texttt{round}     & \texttt{round(x)}                   & Round to nearest integer (half up). \\
+\texttt{round\_to} & \texttt{round\_to(x, decimals)}     & Round to $d$ decimal places. \\
+\texttt{mod}       & \texttt{mod(a, b)}                  & Modulo, always non-negative: \texttt{mod(-1, 5) = 4}. \\
+\texttt{even}      & \texttt{even(n)}                    & 1 if $n$ is even. \\
+\texttt{odd}       & \texttt{odd(n)}                     & 1 if $n$ is odd. \\
+\texttt{between}   & \texttt{between(x, lo, hi)}         & 1 if $\texttt{lo} \le x \le \texttt{hi}$. \\
+\texttt{hypot}     & \texttt{hypot(a, b)}                & $\sqrt{a^2 + b^2}$. \\
+\texttt{gcd}       & \texttt{gcd(a, b)}                  & Greatest common divisor (integers). \\
+\texttt{lcm}       & \texttt{lcm(a, b)}                  & Least common multiple. \\
+\texttt{ipow}      & \texttt{ipow(base, exp)}            & Integer power ($\texttt{exp} \ge 0$). \\
+\texttt{lerp}      & \texttt{lerp(a, b, t)}              & Linear interpolation. Works on scalars and vectors. \\
+\texttt{map\_range}& \texttt{map\_range(x,il,ih,ol,oh)}  & Re-map from one range to another. \\
+\texttt{deg2rad}   & \texttt{deg2rad(d)}                 & Degrees to radians. \\
+\texttt{rad2deg}   & \texttt{rad2deg(r)}                 & Radians to degrees. \\
+\bottomrule
+\end{longtable}
+
+\subsubsection{Number formatting}
+
+\begin{longtable}{@{}L{3.5cm}L{4.5cm}L{6.5cm}@{}}
+\toprule
+\textbf{Function} & \textbf{Signature} & \textbf{Description} \\
+\midrule
+\endhead
+\texttt{pad\_left}  & \texttt{pad\_left(s, w, ch)}    & Pad string on left to width $w$ with character \texttt{ch}. \\
+\texttt{pad\_right} & \texttt{pad\_right(s, w, ch)}   & Pad string on right to width $w$. \\
+\texttt{fmt\_fixed} & \texttt{fmt\_fixed(x, d)}       & Format number with exactly $d$ decimal places. \\
+\texttt{fmt\_pct}   & \texttt{fmt\_pct(x, d)}         & Format as percentage: \texttt{fmt\_pct(0.752, 1)} $\to$ \texttt{"75.2\%"}. \\
+\bottomrule
+\end{longtable}
+
+\subsubsection{String utilities}
+
+\begin{longtable}{@{}L{3.5cm}L{4.5cm}L{6.5cm}@{}}
+\toprule
+\textbf{Function} & \textbf{Signature} & \textbf{Description} \\
+\midrule
+\endhead
+\texttt{starts\_with} & \texttt{starts\_with(s, prefix)}   & 1 if \texttt{s} starts with \texttt{prefix}. \\
+\texttt{ends\_with}   & \texttt{ends\_with(s, suffix)}     & 1 if \texttt{s} ends with \texttt{suffix}. \\
+\texttt{ltrim}        & \texttt{ltrim(s)}                  & Remove leading spaces. \\
+\texttt{rtrim}        & \texttt{rtrim(s)}                  & Remove trailing spaces. \\
+\texttt{trim}         & \texttt{trim(s)}                   & Remove leading and trailing spaces. \\
+\texttt{repeat\_str}  & \texttt{repeat\_str(s, n)}         & Repeat string $n$ times. \\
+\texttt{count\_str}   & \texttt{count\_str(s, pattern)}    & Count non-overlapping occurrences of \texttt{pattern}. \\
+\texttt{replace}      & \texttt{replace(s, old, new)}      & Replace all occurrences of \texttt{old} with \texttt{new}. \\
+\bottomrule
+\end{longtable}
+
+\subsubsection{Vector statistics}
+
+These functions apply to \emph{vectors}. \texttt{mean} and \texttt{stdev} also
+accept arrays (via internal dispatch on \texttt{type}).
+
+\begin{longtable}{@{}L{3.5cm}L{3.8cm}L{7.2cm}@{}}
+\toprule
+\textbf{Function} & \textbf{Signature} & \textbf{Description} \\
+\midrule
+\endhead
+\texttt{mean}       & \texttt{mean(x)}        & Arithmetic mean. Accepts vector or numeric array. \\
+\texttt{stdev}      & \texttt{stdev(x)}       & Population standard deviation. Accepts vector or numeric array. \\
+\texttt{normalize}  & \texttt{normalize(v)}   & Scale vector to $[0, 1]$ (min becomes 0, max becomes 1). \\
+\texttt{dot}        & \texttt{dot(a, b)}      & Dot product of two vectors: $\sum a_i b_i$. \\
+\bottomrule
+\end{longtable}
+
+\subsubsection{Array algorithms}
+
+\begin{longtable}{@{}L{3.5cm}L{4cm}L{7cm}@{}}
+\toprule
+\textbf{Function} & \textbf{Signature} & \textbf{Description} \\
+\midrule
+\endhead
+\texttt{total}      & \texttt{total(a)}           & Sum of all numeric elements in array. (Note: use \texttt{sum} for vectors.) \\
+\texttt{minimum}    & \texttt{minimum(a)}         & Smallest element. (Note: \texttt{min(a,b)} compares two scalars.) \\
+\texttt{maximum}    & \texttt{maximum(a)}         & Largest element. \\
+\texttt{contains}   & \texttt{contains(a, val)}   & 1 if \texttt{val} is in array. \\
+\texttt{index\_of}  & \texttt{index\_of(a, val)}  & First index of \texttt{val}, or $-1$. \\
+\texttt{reversed}   & \texttt{reversed(a)}        & New array in reversed order. Original unchanged. \\
+\texttt{sorted}     & \texttt{sorted(a)}          & New array sorted ascending (numeric). Original unchanged. \\
+\texttt{zip}        & \texttt{zip(a, b)}          & Pair elements: \texttt{zip([1,2],["a","b"])} $\to$ \texttt{[[1,"a"],[2,"b"]]}. Stops at shorter. \\
+\texttt{flatten}    & \texttt{flatten(a)}         & Collapse one level of nesting. \\
+\bottomrule
+\end{longtable}
+
+\subsubsection{Higher-order functions}
+
+\begin{longtable}{@{}L{3.5cm}L{5cm}L{6.5cm}@{}}
+\toprule
+\textbf{Function} & \textbf{Signature} & \textbf{Description} \\
+\midrule
+\endhead
+\texttt{map}    & \texttt{map(a, f)}           & Apply proc \texttt{f} to each element; return new array. \\
+\texttt{filter} & \texttt{filter(a, pred)}     & Keep elements for which \texttt{pred(x)} is truthy. \\
+\texttt{reduce} & \texttt{reduce(a, f, init)}  & Fold: \texttt{acc = f(acc, x)} for each element, starting from \texttt{init}. \\
+\bottomrule
+\end{longtable}
+
+\begin{lstlisting}
+var doubled = map([1,2,3,4], proc(x){ return x * 2 })   # [2,4,6,8]
+var evens   = filter([1..8], proc(x){ return mod(x,2)==0 })
+var total3  = reduce([1,2,3,4,5], proc(a,x){ return a+x }, 0)   # 15
+\end{lstlisting}
+
+\subsubsection{Testing framework}
+
+\begin{longtable}{@{}L{3.5cm}L{5cm}L{6.5cm}@{}}
+\toprule
+\textbf{Function} & \textbf{Signature} & \textbf{Description} \\
+\midrule
+\endhead
+\texttt{assert}      & \texttt{assert(cond, msg)}      & Fail with message if \texttt{cond} is falsy. \\
+\texttt{assert\_eq}  & \texttt{assert\_eq(a, b, msg)}  & Fail if \texttt{a != b}, showing both values. \\
+\texttt{assert\_near}& \texttt{assert\_near(a,b,eps,msg)} & Fail if $|a - b| > \varepsilon$. Use for floating-point tests. \\
+\texttt{test\_summary} & \texttt{test\_summary()}     & Print pass/fail counts. \\
+\bottomrule
+\end{longtable}
+
+Global counters \texttt{\_tests\_run}, \texttt{\_tests\_passed}, and
+\texttt{\_tests\_failed} are maintained automatically.
+
+
+\subsection{System library}
+
+The system library (\musil{system.mu}) provides practical I/O and operating-system oriented services. In the current setup, the most important functions are:
+\begin{itemize}
+    \item \texttt{sleep(ms)}: suspend execution for a number of milliseconds.
+    \item \texttt{clock()}: return the current processor time.
+    \item \texttt{dirlist(path)}: list directory contents.
+    \item \texttt{filestat(path)}: query basic file information such as existence, size, and permissions.
+    \item \texttt{getvar(name)}: retrieve an environment variable.
+    \item \texttt{udpsend(host, port, message)} and \texttt{udprecv(host, port)}: basic UDP messaging.
+    \item \texttt{readcsv(path)} and \texttt{writecsv(path, table)}: CSV file import/export.
+    \item \texttt{readwav(path)} and \texttt{writewav(path, sr, channels)}: WAV file input/output.
+\end{itemize}
+
+At the language level, \texttt{readwav} returns a two-element structure \texttt{[sr, channels]}, where \texttt{sr} is the sample rate and \texttt{channels} is an array of vectors, one vector per channel. Conversely, \texttt{writewav} expects a filename, a scalar sample rate, and an array of channels of equal length. The underlying implementation supports PCM WAV reading and writing through the companion WAV utilities. 
+
+The core library also includes generic text/file helpers such as \texttt{read}, \texttt{write}, \texttt{append}, \texttt{load}, \texttt{eval}, \texttt{exec}, and \texttt{apply}. These functions are not part of the separate system header, but they are essential in practice because they make it possible to compose library code, load Musil source files, and build higher-level wrappers in \texttt{.mu}. 
+
+\subsection{Signals library}
+
+The signals library (\musil{signals.mu}) is centered on dense numeric vectors and provides synthesis, spectral processing, filtering, convolution, and signal-analysis primitives. The builtins registered by the library include:
+\begin{itemize}
+    \item synthesis: \texttt{mix}, \texttt{gen}, \texttt{osc}
+    \item spectral transforms: \texttt{fft}, \texttt{ifft}, \texttt{car2pol}, \texttt{pol2car}, \texttt{window}
+    \item spectral descriptors: \texttt{speccent}, \texttt{specspread}, \texttt{specskew}, \texttt{speckurt}, \texttt{specflux}, \texttt{specirr}, \texttt{specdecr}, \texttt{acorrf0}, \texttt{energy}, \texttt{zcr}
+    \item convolution and channel operations: \texttt{conv}, \texttt{convmc}, \texttt{deinterleave}, \texttt{interleave}
+    \item vector/block helpers: \texttt{vslice}, \texttt{vaddat}
+    \item filters and delay-based effects: \texttt{dcblock}, \texttt{reson}, \texttt{filter}, \texttt{filtdesign}, \texttt{delay}, \texttt{comb}, \texttt{allpass}, \texttt{resample}
+\end{itemize}
+These are the functions explicitly registered by \texttt{add\_signals(env)}. 
+
+Several details are worth stressing. First, the library is intentionally vector-oriented: most functions consume and produce \texttt{NumVal} vectors rather than general arrays. FFT-related functions work on interleaved complex data, and the packed representation used by helper functions reduces array traffic by storing paired streams in a single vector when useful. Second, \texttt{convmc} is the exception that still uses an array-of-vectors representation, because a multichannel signal is naturally structured as a list of channels rather than a single homogeneous vector. Third, \texttt{vaddat} is especially important for overlap-add workflows, because it performs block insertion/addition in compiled code rather than in an interpreted inner loop. 
+
+At the \texttt{signals.mu} level, one typically defines higher-level DSP procedures by composing the builtins above. In the current Musil setup, these helper procedures include short-time Fourier transform workflows such as \texttt{stft} and \texttt{istft}, as well as convenience wrappers around \texttt{filtdesign} and \texttt{filter} for standard biquad types such as low-pass, high-pass, notch, peak, and shelving filters. These \texttt{.mu} procedures do not add new low-level capabilities; rather, they package recurring signal-processing idioms into more ergonomic forms.
+
+\subsection{Scientific library}
+
+The scientific library (\musil{scientific.mu}) provides matrix algebra, statistics, interpolation, machine learning, and utility procedures for structured numerical work. At the language level, a matrix is represented as an array of numeric row vectors. This representation is deliberately simple and makes expressions such as \texttt{M[i]} (row extraction) and \texttt{M[i][j]} (element access) natural. The conversion helpers in the implementation explicitly map between this language-level format and the internal C++ matrix class. :contentReference[oaicite:5]{index=5}
+
+The core matrix and linear-algebra operations include:
+\begin{itemize}
+    \item \texttt{matdisp}, \texttt{matadd}, \texttt{matsub}, \texttt{matmul}, \texttt{hadamard}, \texttt{transpose}
+    \item \texttt{nrows}, \texttt{ncols}, \texttt{matsum}, \texttt{getrows}, \texttt{getcols}
+    \item constructors and structured generators such as \texttt{eye}, \texttt{rand}, \texttt{zeros}, \texttt{ones}, \texttt{bpf}
+    \item decomposition and algebraic operators such as \texttt{inv}, \texttt{det}, \texttt{diag}, \texttt{rank}, \texttt{solve}
+\end{itemize}
+The library also exposes statistical and analysis-oriented functions such as:
+\begin{itemize}
+    \item \texttt{median}, \texttt{linefit}, \texttt{norm}, \texttt{dist}
+    \item \texttt{matmean}, \texttt{matstd}, \texttt{cov}, \texttt{corr}, \texttt{zscore}
+    \item \texttt{pca}, \texttt{kmeans}, and \texttt{knn}
+\end{itemize}
+These functions are all implemented as builtins operating on vectors or matrices in the array-of-rows representation. 
+
+In practice, the scientific library works especially well together with the plotting layer. Functions such as \texttt{matcol}, \texttt{getcols}, \texttt{linefit}, \texttt{pca}, and \texttt{kmeans} produce data that can be directly visualized by \texttt{plot} and \texttt{scatter}. Because matrices remain explicit arrays of row vectors rather than flattened packed buffers, the scientific API is more verbose than the packed signal API, but also more transparent and easier to manipulate interactively. 
+
+\subsection{Plotting library}
+
+The plotting library (\musil{plotting.mu})  provides two builtins:
+\begin{itemize}
+    \item \texttt{plot(title, y\_1, legend\_1, y\_2, legend\_2, \dots, style)}
+    \item \texttt{scatter(title, x\_1, y\_1, legend\_1, x\_2, y\_2, legend\_2, \dots, style)}
+\end{itemize}
+In both cases, the last argument is a plotting style:
+\begin{itemize}
+    \item \texttt{"*"} for line plus markers
+    \item \texttt{"."} for markers only
+    \item \texttt{"-"} for line only
+\end{itemize}
+Both functions generate an SVG file and \emph{return its filename as a string}; they do not print the filename automatically. The SVG backend computes axis ranges, draws simple axes and tick marks, adds optional legends, and stores the file under a sanitized title-based name. 
+
+The companion \texttt{plotting.mu} layer is meant to collect convenience procedures built on top of the two builtins. Typical helper functions include quick plotting wrappers such as \texttt{qplot}, \texttt{qplot2}, and \texttt{qscatter}, together with column-oriented utilities such as \texttt{plot\_col}, \texttt{plot\_cols2}, and \texttt{scatter\_cols}. These functions are not performance-critical; their purpose is to reduce repetitive plotting boilerplate in data-analysis scripts.
+
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Extending Musil from C++}
+\label{sec:extend}
+% ─────────────────────────────────────────────────────────────────────────────
+
+Musil is designed to be embedded. Any C++ application can register custom
+builtins that become callable from Musil scripts.
+
+\subsection{Including Musil}
+
+\begin{lstlisting}[language=C++]
+#include "musil.h"
+
+int main() {
+    Environment env;
+    env.exec("print \"hello\"", "script.mu");
+}
+\end{lstlisting}
+
+\subsection{Registering a builtin}
+
+A builtin has the signature:
+\texttt{Value(std::vector<Value>\&, Interpreter\&)}.
+
+\begin{lstlisting}[language=C++]
+env.register_builtin("midi_to_hz", [](std::vector<Value>& args, Interpreter& I) -> Value {
+    double midi = std::get<NumVal>(args[0])[0];
+    return NumVal{440.0 * std::pow(2.0, (midi - 69.0) / 12.0)};
+});
+\end{lstlisting}
+
+After this call, \musil{midi_to_hz(69)} is available in all Musil scripts run
+through \texttt{env}.
+
+\subsection{Injecting global variables}
+
+\begin{lstlisting}[language=C++]
+env.globals["SAMPLE_RATE"] = NumVal{48000.0};
+env.globals["SOL_PATH"]    = std::string{"/opt/sol/samples"};
+\end{lstlisting}
+
+\subsection{Value types in C++}
+
+\begin{center}
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{Musil type} & \textbf{C++ type} & \textbf{Access} \\
+\midrule
+number / vector  & \texttt{NumVal} = \texttt{std::valarray<double>} & \texttt{std::get<NumVal>(v)} \\
+string           & \texttt{std::string}                              & \texttt{std::get<std::string>(v)} \\
+array            & \texttt{ArrayPtr} = \texttt{shared\_ptr<MusilArray>} & \texttt{std::get<ArrayPtr>(v)} \\
+proc             & \texttt{ProcVal} = \texttt{shared\_ptr<Proc>}    & \texttt{std::get<ProcVal>(v)} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Use \texttt{std::holds\_alternative<T>(v)} to test the type before accessing.
+Throw \texttt{Error\{filename, line, message, \{\}\}} for runtime errors from
+builtins.
+
+\section{The Musil IDE}
+
+The Musil IDE provides an integrated environment for writing, evaluating, and exploring Musil programs. It is designed to offer a lightweight but expressive workflow, combining a text editor, a console, and interactive tools for inspecting the runtime environment.
+
+\subsection{Overview}
+
+The IDE is organized into three main areas:
+
+\begin{itemize}
+    \item \textbf{Editor}: the main text area where Musil code is written and edited. It supports syntax highlighting, line numbers, and basic editing operations.
+    \item \textbf{Console}: displays output produced by the program, including \texttt{print} statements and error messages.
+    \item \textbf{Listener}: a small input field that allows evaluating single-line expressions interactively, similar to a REPL.
+    \item \textbf{Environment Panel}: shows currently defined variables and procedures, allowing quick inspection of the program state.
+\end{itemize}
+
+\subsection{Basic Features}
+
+The IDE includes the following core features:
+
+\begin{itemize}
+    \item \textbf{Run Script}: executes the entire content of the editor.
+    \item \textbf{Run Selection}: executes only the selected portion of the code.
+    \item \textbf{Stop}: interrupts a running computation (effective between evaluation steps).
+    \item \textbf{Reset Environment}: clears all variables and procedures and restarts the Musil environment.
+    \item \textbf{Syntax Highlighting}: highlights keywords, strings, comments, and structural elements.
+    \item \textbf{Auto-completion}: triggered with \texttt{Ctrl+Tab}, suggests builtins and user-defined symbols.
+    \item \textbf{Find/Replace}: supports searching and replacing text within the editor.
+    \item \textbf{Zoom}: allows increasing or decreasing the font size.
+    \item \textbf{Interactive Evaluation}: expressions can be evaluated directly in the listener without modifying the main script.
+\end{itemize}
+
+\subsection{File Management}
+
+The IDE supports standard file operations:
+
+\begin{itemize}
+    \item Create new files
+    \item Open existing files
+    \item Save and Save As
+\end{itemize}
+
+The current file location is used as a reference for resolving relative paths during execution.
+
+\subsection{Libraries and Installation}
+
+To access the full capabilities of the language, including higher-level utilities and extended functions, it is necessary to install the Musil standard libraries.
+
+This can be done directly from the IDE:
+
+\begin{quote}
+\texttt{Evaluate $\rightarrow$ Install libraries...}
+\end{quote}
+
+This operation copies the available \texttt{.mu} library files into the user directory (typically \texttt{\textasciitilde{}/.musil}), making them available to the \texttt{load} function.
+
+Without installing the libraries, only the core built-in functionality of the language is available.
+
+\subsection{Notes}
+
+\begin{itemize}
+    \item Long computations can be interrupted using the Stop command, but interruption occurs only at safe evaluation points.
+    \item Output is streamed to the console during execution.
+    \item The environment panel updates dynamically after each evaluation.
+\end{itemize}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Quick Reference}
+\label{sec:quickref}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\subsection*{Language grammar summary}
+
+\begin{lstlisting}[numbers=none]
+statement  ::= var name = expr
+             | name = expr
+             | name[expr] = expr
+             | proc name (params) { stmts }
+             | if (expr) { stmts } (else if (expr) { stmts })* (else { stmts })?
+             | while (expr) { stmts }
+             | for (var name in expr) { stmts }
+             | return expr
+             | break
+             | print expr*
+             | call
+
+expr       ::= or_expr (< > <= >= == != or_expr)*
+or_expr    ::= and_expr (or and_expr)*
+and_expr   ::= not_expr (and not_expr)*
+not_expr   ::= not not_expr | comparison
+comparison ::= add ((< > <= >= == !=) add)*
+add        ::= mul ((+ -) mul)*
+mul        ::= unary ((* /) unary)*
+unary      ::= - unary | atom ([expr])* ((args))?
+atom       ::= number | string | [exprs] | (expr) | name | proc(params){stmts}
+\end{lstlisting}
+
+\subsection*{Common patterns}
+
+\begin{lstlisting}
+# Integer loop
+for (var i in range(0, 10)) { print i }
+
+# Numeric vector operation
+var wave = sin(linspace(0, TAU, 512))
+
+# Map over array
+var doubled = map(data, proc(x){ return x * 2 })
+
+# Sort and get min/max
+var s = sorted(data)
+print s[0]      # minimum
+print s[-1]     # maximum
+
+# Convert array to vector for math
+var v = to_vec(numeric_array)
+print mean(v) "  std=" stdev(v)
+
+# Filter and reduce
+var positives = filter(data, proc(x){ return x > 0 })
+var total4    = reduce(positives, proc(a,x){ return a+x }, 0)
+\end{lstlisting}
+
+\subsection*{Licensing}
+
+The Musil language is released under the BSD 2-Clause license.
+
+
+\end{document}

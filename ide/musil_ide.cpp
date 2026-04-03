@@ -1518,7 +1518,7 @@ void build_app_menu_bar() {
     app_menu_bar->add("Evaluate/Run selection",       FL_COMMAND+'e', menu_run_selection_callback);
     app_menu_bar->add("Evaluate/Stop",                FL_COMMAND+',', menu_stop_callback, nullptr, FL_MENU_DIVIDER);
     app_menu_bar->add("Evaluate/Reset environment",   FL_COMMAND+'j', menu_clear_env_callback, nullptr, FL_MENU_DIVIDER);
-    app_menu_bar->add("Evaluate/Paths...",            0,              menu_paths_callback);
+    //app_menu_bar->add("Evaluate/Paths...",            0,              menu_paths_callback);
     app_menu_bar->add("Evaluate/Install libraries...", 0,             menu_install_libraries_callback);
 
     // View
