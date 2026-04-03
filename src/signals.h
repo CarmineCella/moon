@@ -12,6 +12,9 @@
 
 using Real = double;
 
+// IDE / host yield hook for long-running signal builtins.
+static inline void sig_yield(Interpreter& I) { I.maybe_yield(); }
+
 // ── Local helpers ─────────────────────────────────────────────────────────────
 
 static double sig_scalar(const Value& v, const std::string& fn) {
@@ -144,6 +147,7 @@ static Value fn_mix(std::vector<Value>& args, Interpreter& I) {
         throw Error{I.filename, I.cur_line(), "mix: arguments must be (pos, sig) pairs"};
     std::vector<Real> out;
     for (std::size_t i = 0; i < args.size() / 2; ++i) {
+        sig_yield(I);
         int p = (int)sig_scalar(args[i*2], "mix");
         if (p < 0) throw Error{I.filename, I.cur_line(), "mix: negative position"};
         const NumVal& sig = sig_nvec(args[i*2+1], "mix");
@@ -178,6 +182,7 @@ static Value fn_osc(std::vector<Value>& args, Interpreter& I) {
     std::valarray<Real> out(Real(0), freqs.size());
     Real phi = 0;
     for (std::size_t i = 0; i < freqs.size(); ++i) {
+        if ((i & 1023u) == 0) sig_yield(I);
         int ip = (int)phi;
         Real fp = phi - ip;
         out[i] = (1 - fp) * table[ip] + fp * table[ip + 1];
@@ -194,7 +199,7 @@ static Value fn_fft(std::vector<Value>& args, Interpreter& I) {
     const NumVal& sig = sig_nvec(args[0], "fft");
     int d = (int)sig.size(), N = next_pow2(d);
     std::valarray<Real> buf(Real(0), 2 * N);
-    for (int i = 0; i < N; ++i) { buf[2*i] = (i < d ? sig[i] : Real(0)); buf[2*i+1] = Real(0); }
+    for (int i = 0; i < N; ++i) { if ((i & 1023) == 0) sig_yield(I); buf[2*i] = (i < d ? sig[i] : Real(0)); buf[2*i+1] = Real(0); }
     fft<Real>(&buf[0], N, -1);
     return NumVal(buf);
 }
@@ -209,7 +214,7 @@ static Value fn_ifft(std::vector<Value>& args, Interpreter& I) {
     std::valarray<Real> buf(spec);
     fft<Real>(&buf[0], N, +1);
     std::valarray<Real> out(Real(0), N);
-    for (int i = 0; i < N; ++i) out[i] = buf[2*i] / N;
+    for (int i = 0; i < N; ++i) { if ((i & 1023) == 0) sig_yield(I); out[i] = buf[2*i] / N; }
     return NumVal(out);
 }
 
@@ -253,7 +258,7 @@ static Value fn_deinterleave(std::vector<Value>& args, Interpreter& I) {
         throw Error{I.filename, I.cur_line(), "deinterleave: signal length must be even"};
     int N = L / 2;
     std::valarray<Real> a(Real(0), N), b(Real(0), N);
-    for (int i = 0; i < N; ++i) { a[i] = in[2*i]; b[i] = in[2*i+1]; }
+    for (int i = 0; i < N; ++i) { if ((i & 1023) == 0) sig_yield(I); a[i] = in[2*i]; b[i] = in[2*i+1]; }
     return pack_pair(NumVal(a), NumVal(b), "deinterleave");
 }
 
@@ -281,7 +286,7 @@ static Value fn_interleave(std::vector<Value>& args, Interpreter& I) {
         throw Error{I.filename, I.cur_line(), "interleave: both channels must have the same length"};
     int N = (int)a.size();
     std::valarray<Real> out(Real(0), 2 * N);
-    for (int i = 0; i < N; ++i) { out[2*i] = a[i]; out[2*i+1] = b[i]; }
+    for (int i = 0; i < N; ++i) { if ((i & 1023) == 0) sig_yield(I); out[2*i] = a[i]; out[2*i+1] = b[i]; }
     return NumVal(out);
 }
 
@@ -382,6 +387,7 @@ static Value fn_convmc(std::vector<Value>& args, Interpreter& I) {
     int max_ch = std::max(nx, ny);
     auto out = std::make_shared<Array>();
     for (int i = 0; i < max_ch; ++i) {
+        sig_yield(I);
         const NumVal& xch = sig_nvec(matx[i < nx ? i : nx-1], "convmc");
         const NumVal& ych = sig_nvec(maty[i < ny ? i : ny-1], "convmc");
         out->elems.push_back(NumVal(conv_one_channel(std::valarray<Real>(xch), std::valarray<Real>(ych))));
@@ -409,8 +415,8 @@ static Value fn_vaddat(std::vector<Value>& args, Interpreter& I) {
     std::size_t need = (std::size_t)pos + src.size();
     std::size_t out_sz = std::max(dst.size(), need);
     std::valarray<Real> out(Real(0), out_sz);
-    for (std::size_t i = 0; i < dst.size(); ++i) out[i] = dst[i];
-    for (std::size_t i = 0; i < src.size(); ++i) out[(std::size_t)pos + i] += src[i];
+    for (std::size_t i = 0; i < dst.size(); ++i) { if ((i & 2047u) == 0) sig_yield(I); out[i] = dst[i]; }
+    for (std::size_t i = 0; i < src.size(); ++i) { if ((i & 2047u) == 0) sig_yield(I); out[(std::size_t)pos + i] += src[i]; }
     return NumVal(out);
 }
 
@@ -423,7 +429,7 @@ static Value fn_dcblock(std::vector<Value>& args, Interpreter& I) {
     std::valarray<Real> y(Real(0), N);
     if (N == 0) return NumVal(y);
     y[0] = x[0];
-    for (int n = 1; n < N; ++n) y[n] = x[n] - x[n-1] + R * y[n-1];
+    for (int n = 1; n < N; ++n) { if ((n & 1023) == 0) sig_yield(I); y[n] = x[n] - x[n-1] + R * y[n-1]; }
     return NumVal(y);
 }
 
@@ -443,6 +449,7 @@ static Value fn_reson(std::vector<Value>& args, Interpreter& I) {
     std::valarray<Real> out(Real(0), samps);
     Real y1 = 0, y2 = 0;
     for (int i = 0; i < samps; ++i) {
+        if ((i & 1023) == 0) sig_yield(I);
         Real xi = i < insize ? x[i] : Real(0);
         Real v = gain * xi - a1 * y1 - a2 * y2;
         y2 = y1; y1 = v; out[i] = v;
@@ -471,6 +478,7 @@ static Value fn_filter(std::vector<Value>& args, Interpreter& I) {
     int N = (int)x.size(), Nb = (int)bn.size(), Na = (int)an.size();
     std::valarray<Real> y(Real(0), N);
     for (int n = 0; n < N; ++n) {
+        if ((n & 511) == 0) sig_yield(I);
         Real acc = 0;
         for (int k = 0; k < Nb; ++k) if (n-k >= 0) acc += bn[k] * x[n-k];
         for (int k = 1; k < Na; ++k) if (n-k >= 0) acc -= an[k] * y[n-k];
@@ -557,6 +565,7 @@ static Value fn_comb(std::vector<Value>& args, Interpreter& I) {
     int N = (int)x.size();
     std::valarray<Real> y(Real(0), N);
     for (int n = 0; n < N; ++n) {
+        if ((n & 1023) == 0) sig_yield(I);
         Real fb = (n - D >= 0) ? g * y[n-D] : Real(0);
         y[n] = x[n] + fb;
     }
@@ -572,6 +581,7 @@ static Value fn_allpass(std::vector<Value>& args, Interpreter& I) {
     int N = (int)x.size();
     std::valarray<Real> y(Real(0), N);
     for (int n = 0; n < N; ++n) {
+        if ((n & 1023) == 0) sig_yield(I);
         Real xmD = (n-D >= 0) ? x[n-D] : Real(0);
         Real ymD = (n-D >= 0) ? y[n-D] : Real(0);
         y[n] = -g * x[n] + xmD + g * ymD;

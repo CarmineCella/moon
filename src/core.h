@@ -885,9 +885,29 @@ struct Interpreter {
     Value mul() {
         Value l = unary();
         while (check(STAR)||check(SLASH)) {
-            bool star = consume().type==STAR; Value r = unary();
-            if (star) l = nv_binop(std::get<NumVal>(l), std::get<NumVal>(r), '*');
-            else      l = nv_binop(std::get<NumVal>(l), std::get<NumVal>(r), '/');
+            bool star = consume().type==STAR;
+            Value r = unary();
+            if (!std::holds_alternative<NumVal>(l) ||
+                !std::holds_alternative<NumVal>(r)) {
+                if (std::holds_alternative<ArrayPtr>(l) ||
+                    std::holds_alternative<ArrayPtr>(r)) {
+                    throw make_err(
+                        star
+                        ? "operator '*': not defined for matrices; use matmul(A, B)"
+                        : "operator '/': not defined for matrices"
+                    );
+                }
+
+                throw make_err(
+                    star
+                    ? "operator '*': invalid operand types"
+                    : "operator '/': invalid operand types"
+                );
+            }
+            if (star)
+                l = nv_binop(std::get<NumVal>(l), std::get<NumVal>(r), '*');
+            else
+                l = nv_binop(std::get<NumVal>(l), std::get<NumVal>(r), '/');
         }
         return l;
     }

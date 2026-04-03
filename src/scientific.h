@@ -30,6 +30,8 @@
 #include <algorithm>
 #include <cmath>
 
+static inline void sci_yield(Interpreter& I) { I.maybe_yield(); }
+
 // ── Conversion helpers ────────────────────────────────────────────────────────
 
 // Array-of-Vectors → C++ Matrix<double>
@@ -127,9 +129,11 @@ static Value fn_hadamard(std::vector<Value>& args, Interpreter& interp) {
         Matrix<double> b = arr2matrix(args[i], "hadamard");
         if (a.rows() != b.rows() || a.cols() != b.cols())
             throw Error{interp.filename, interp.cur_line(), "hadamard: shape mismatch"};
-        for (std::size_t r = 0; r < a.rows(); ++r)
+        for (std::size_t r = 0; r < a.rows(); ++r) {
+            if ((r & 255u) == 0) sci_yield(interp);
             for (std::size_t c = 0; c < a.cols(); ++c)
                 a(r, c) *= b(r, c);
+        }
     }
     return matrix2arr(a);
 }
@@ -197,12 +201,15 @@ static Value fn_rand(std::vector<Value>& args, Interpreter& interp) {
     if (len <= 0 || rows <= 0) throw Error{interp.filename, interp.cur_line(), "rand: dimensions must be positive"};
     if (rows == 1) {
         NumVal out(len);
-        for (int i = 0; i < len; ++i)
+        for (int i = 0; i < len; ++i) {
+            if ((i & 1023) == 0) sci_yield(interp);
             out[i] = ((double)std::rand() / RAND_MAX) * 2.0 - 1.0;
+        }
         return out;
     }
     auto arr = std::make_shared<Array>();
     for (int r = 0; r < rows; ++r) {
+        if ((r & 255) == 0) sci_yield(interp);
         NumVal row(len);
         for (int i = 0; i < len; ++i)
             row[i] = ((double)std::rand() / RAND_MAX) * 2.0 - 1.0;
@@ -220,7 +227,10 @@ static Value fn_zeros(std::vector<Value>& args, Interpreter& interp) {
     if (len <= 0 || rows <= 0) throw Error{interp.filename, interp.cur_line(), "zeros: dimensions must be positive"};
     if (rows == 1) return NumVal((size_t)len);
     auto arr = std::make_shared<Array>();
-    for (int r = 0; r < rows; ++r) arr->elems.push_back(NumVal((size_t)len));
+    for (int r = 0; r < rows; ++r) {
+        if ((r & 255) == 0) sci_yield(interp);
+        arr->elems.push_back(NumVal((size_t)len));
+    }
     return arr;
 }
 
@@ -232,7 +242,10 @@ static Value fn_ones(std::vector<Value>& args, Interpreter& interp) {
     if (len <= 0 || rows <= 0) throw Error{interp.filename, interp.cur_line(), "ones: dimensions must be positive"};
     if (rows == 1) return NumVal(1.0, (size_t)len);
     auto arr = std::make_shared<Array>();
-    for (int r = 0; r < rows; ++r) arr->elems.push_back(NumVal(1.0, (size_t)len));
+    for (int r = 0; r < rows; ++r) {
+        if ((r & 255) == 0) sci_yield(interp);
+        arr->elems.push_back(NumVal(1.0, (size_t)len));
+    }
     return arr;
 }
 
@@ -250,6 +263,7 @@ static Value fn_bpf(std::vector<Value>& args, Interpreter& interp) {
     bpf.add_segment(init, len0, end0);
     double curr = end0;
     for (std::size_t i = 0; i < remaining / 2; ++i) {
+        if ((i & 255u) == 0) sci_yield(interp);
         int  seg_len = (int)scalar(args[3 + 2*i],     "bpf");
         double seg_end =      scalar(args[3 + 2*i + 1], "bpf");
         if (seg_len <= 0) throw Error{interp.filename, interp.cur_line(), "bpf: segment length must be positive"};
@@ -308,6 +322,7 @@ static Value fn_rank(std::vector<Value>& args, Interpreter& interp) {
     const double eps = 1e-10;
     std::size_t r = 0, rank = 0;
     for (std::size_t c = 0; c < cols && r < rows; ++c) {
+        if ((c & 31u) == 0) sci_yield(interp);
         std::size_t piv = r;
         double maxv = std::fabs(m(r, c));
         for (std::size_t i = r + 1; i < rows; ++i) {
@@ -696,6 +711,7 @@ static Value fn_knn(std::vector<Value>& args, Interpreter& interp) {
     int features = (int)std::get<NumVal>(first[0]).size();
     KNN<double> knn_model(K, features);
     for (int i = 0; i < obs; ++i) {
+        if ((i & 255) == 0) sci_yield(interp);
         const auto& item = std::get<ArrayPtr>(train_arr[i])->elems;
         auto* o = new Observation<double>();
         o->attributes = std::valarray<double>(std::get<NumVal>(item[0]));
@@ -707,6 +723,7 @@ static Value fn_knn(std::vector<Value>& args, Interpreter& interp) {
     const auto& queries = std::get<ArrayPtr>(args[2])->elems;
     auto out = std::make_shared<Array>();
     for (const auto& q : queries) {
+        sci_yield(interp);
         Observation<double> qo;
         qo.attributes = std::valarray<double>(nvec(q, "knn query"));
         out->elems.push_back(knn_model.classify(qo));
