@@ -7,7 +7,7 @@ load ("signals.mu")
 var s = readwav ("../../data/Concertgebouw-s.wav")[1]
 play (s)
 play (s, 22050) # change SR
-play ([s[0], s[1], s[0], s[1], s[0], s[1], s[0], s[1]]) # fake multi-channels
+play ([s[0], s[1], s[0], s[1], s[0], s[1], s[0], s[1]]) # fake multi-channel
 
 # play a sine asycn	
 var tab1 = gen(4096, 1)
@@ -33,4 +33,7 @@ playfile ("../../data/cage.wav", 1)
 sleep (1000)
 playfile ("../../data/Gambale_cut.wav", 1)
 
-print "done playback"
+# keep interpreter alive till the end of the playback
+while (dacrunning ()) {sleep (1000) }
+dacstop ()
+print "finished"

@@ -1,3 +1,5 @@
+# NB: this only works if Musil is compiled with realtime sound support
+
 load("signals.mu")
 load ("stdlib.mu")
 
@@ -29,4 +31,9 @@ sleep(500)
 
 # sound 3 
 play_async(sine(660, 10, 0.2, sr))
+
+# keep interpreter alive till the end of the playback
+while (dacrunning ()) {sleep (1000) }
+dacstop ()
+print "finished"
 
