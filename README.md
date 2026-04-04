@@ -25,7 +25,8 @@ The signal processing library provides tools for working directly with audio and
 - FFT and spectral transformations  
 - Convolution and filtering  
 - Windowing functions  
-- Feature extraction (centroid, flux, etc.)  
+- Feature extraction (centroid, flux, etc.)
+- Basic realtime sound support
 
 This makes Musil suitable for low-level DSP experiments as well as higher-level sound design.
 
