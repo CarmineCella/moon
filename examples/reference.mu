@@ -121,12 +121,12 @@ section("5. WHILE LOOPS")
 
 # Basic accumulator
 var i = 1
-var total = 0
+var tot = 0
 while (i <= 10) {
-    total = total + i
+    tot = tot + i
     i = i + 1
 }
-print "sum 1..10 = " total
+print "sum 1..10 = " tot
 
 # Break on condition
 var n2 = 1

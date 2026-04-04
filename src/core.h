@@ -10,6 +10,7 @@
 #include <string>
 #include <vector>
 #include <map>
+#include <unordered_map>
 #include <variant>
 #include <functional>
 #include <memory>
@@ -30,10 +31,11 @@ struct Error {
     std::string msg;
     std::vector<std::string> trace;   // proc call stack at point of error
 };
+struct Env;
 struct Proc;
 using NumVal   = std::valarray<double>;
 struct Array;
-struct Proc;                              // forward declaration
+using EnvPtr   = std::shared_ptr<Env>;
 using ArrayPtr = std::shared_ptr<Array>;
 using ProcVal  = std::shared_ptr<Proc>;
 using Value    = std::variant<NumVal, std::string, ArrayPtr, ProcVal>;
@@ -47,7 +49,7 @@ bool values_equal(const Value& a, const Value& b);  // forward declaration
 
 enum TK {
     NUM, STR, IDENT,
-    VAR, PROC, WHILE, FOR, IN, IF, ELSE, RETURN, PRINT, BREAK,
+    VAR, PROC, WHILE, FOR, IN, IF, ELSE, RETURN, PRINT, BREAK, CONTINUE,
     AND, OR, NOT,
     ASSIGN, PLUS, MINUS, STAR, SLASH,
     LT, GT, LE, GE, EQ, NEQ,
@@ -104,6 +106,7 @@ std::vector<Token> lex(const std::string& src, const std::string& filename = "<s
             else if (s=="in")     t=IN;    else if (s=="if")     t=IF;
             else if (s=="else")   t=ELSE;  else if (s=="return") t=RETURN;
             else if (s=="print")  t=PRINT; else if (s=="break")  t=BREAK;
+            else if (s=="continue") t=CONTINUE;
             else if (s=="and")    t=AND;   else if (s=="or")     t=OR;
             else if (s=="not")    t=NOT;
             toks.push_back({t, s, line}); continue;
@@ -125,12 +128,21 @@ std::vector<Token> lex(const std::string& src, const std::string& filename = "<s
     toks.push_back({END, "", line}); return toks;
 }
 
+static constexpr size_t MAX_CALL_DEPTH = 128;
 struct ReturnSignal { Value val; };
 struct BreakSignal  {};
+struct ContinueSignal {};
 struct Proc {
     std::vector<std::string> params;
     std::vector<Token>       body;
     std::string              def_file;
+    EnvPtr                   closure;
+};
+
+struct Env {
+    std::unordered_map<std::string, Value> vars;
+    EnvPtr parent;
+    Env(EnvPtr p = nullptr) : parent(std::move(p)) {}
 };
 
 std::string to_str(const Value& v) {
@@ -191,23 +203,21 @@ static const NumVal& nvec(const Value& v, const std::string& ctx) {
     return std::get<NumVal>(v);
 }
 
+
 struct Interpreter;
 using Builtin = std::function<Value(std::vector<Value>&, Interpreter&)>;
 using YieldFn = std::function<void()>;
 struct Interpreter {
     std::vector<Token>              T;
     size_t                          pos = 0;
-    std::map<std::string, Value>&   globals;
-    std::map<std::string, Value>    locals;
-    std::map<std::string, Proc>&    procs;
+    EnvPtr                          env;
     std::map<std::string, Builtin>& builtins;
     std::function<void(const std::string&, const std::string&)> load_fn;
     YieldFn                         yield_fn;
-    bool in_proc = false;
-    std::string filename;
-    std::vector<std::string>& call_stack;   // shared across all sub-interpreters
+    std::string                     filename;
+    std::vector<std::string>&       call_stack;
 
-    void maybe_yield() { if (yield_fn) yield_fn();  }
+    void maybe_yield() { if (yield_fn) yield_fn(); }
     Token consume()    { return T[pos++]; }
     bool  check(TK t)  { return T[pos].type == t; }
     bool  match(TK t)  { if (check(t)) { pos++; return true; } return false; }
@@ -218,23 +228,34 @@ struct Interpreter {
     int cur_line() { return T[pos].line; }
     Error make_err(const std::string& msg) { return Error{filename, cur_line(), msg, call_stack}; }
 
+    EnvPtr root_env() const {
+        EnvPtr e = env;
+        while (e && e->parent) e = e->parent;
+        return e;
+    }
     Value get_var(const std::string& n) {
-        auto it = locals.find(n);   if (it != locals.end())  return it->second;
-        auto it2 = globals.find(n); if (it2 != globals.end()) return it2->second;
+        for (EnvPtr e = env; e; e = e->parent) {
+            auto it = e->vars.find(n);
+            if (it != e->vars.end()) return it->second;
+        }
         throw make_err("undefined '" + n + "'");
     }
     Value* get_var_ptr(const std::string& n) {
-        auto it = locals.find(n);   if (it != locals.end())  return &it->second;
-        auto it2 = globals.find(n); if (it2 != globals.end()) return &it2->second;
+        for (EnvPtr e = env; e; e = e->parent) {
+            auto it = e->vars.find(n);
+            if (it != e->vars.end()) return &it->second;
+        }
         return nullptr;
     }
     void decl_var(const std::string& n, Value v) {
-        if (in_proc) locals[n] = std::move(v); else globals[n] = std::move(v);
+        env->vars[n] = std::move(v);
     }
     void assign_var(const std::string& n, Value v) {
-        auto it = locals.find(n);   if (it != locals.end())  { it->second = std::move(v); return; }
-        auto it2 = globals.find(n); if (it2 != globals.end()) { it2->second = std::move(v); return; }
-        if (in_proc) locals[n] = std::move(v); else globals[n] = std::move(v);
+        for (EnvPtr e = env; e; e = e->parent) {
+            auto it = e->vars.find(n);
+            if (it != e->vars.end()) { it->second = std::move(v); return; }
+        }
+        env->vars[n] = std::move(v);
     }
 
     NumVal nv_binop(const NumVal& a, const NumVal& b, char op) {
@@ -245,13 +266,13 @@ struct Interpreter {
                 case '*': return a * b; case '/': return a / b;
             }
         }
-        if (sb == 1) {   // b is scalar: broadcast b[0]
+        if (sb == 1) {
             switch(op) {
                 case '+': return a + b[0]; case '-': return a - b[0];
                 case '*': return a * b[0]; case '/': return a / b[0];
             }
         }
-        if (sa == 1) {   // a is scalar: broadcast a[0]
+        if (sa == 1) {
             NumVal ra(a[0], sb);
             switch(op) {
                 case '+': return ra + b; case '-': return ra - b;
@@ -315,6 +336,7 @@ struct Interpreter {
         else if (check(PRINT))  { print_stmt(); }
         else if (check(RETURN)) { consume(); throw ReturnSignal{expr()}; }
         else if (check(BREAK))  { consume(); throw BreakSignal{}; }
+        else if (check(CONTINUE)) { consume(); throw ContinueSignal{}; }
         else if (check(IDENT) && T[pos+1].type == LBRACKET) { indexed_assign(); }
         else if (check(IDENT) && T[pos+1].type == ASSIGN) {
             std::string n = consume().val; consume(); assign_var(n, expr());
@@ -326,7 +348,6 @@ struct Interpreter {
     void indexed_assign() {
         std::string n = consume().val;
         expect(LBRACKET); Value idx = expr(); expect(RBRACKET);
-        // nested a[i][j] = v  — only for ArrayPtr
         if (check(LBRACKET)) {
             Value outer = get_var(n);
             auto& ap = std::get<ArrayPtr>(outer);
@@ -379,7 +400,8 @@ struct Interpreter {
             body.push_back(consume());
         }
         body.push_back({END, ""});
-        procs[name] = {params, std::move(body), filename};
+        auto pv = std::make_shared<Proc>(Proc{std::move(params), std::move(body), filename, env});
+        decl_var(name, pv);
     }
     void run_block() {
         expect(LBRACE);
@@ -425,7 +447,9 @@ struct Interpreter {
             pos = cond;
             expect(LPAREN); bool c = to_bool(expr()) != 0.0; expect(RPAREN);
             if (!c) { skip_block(); break; }
-            try { run_block(); } catch (BreakSignal&) { break; }
+            try { run_block(); }
+            catch (ContinueSignal&) { continue; }
+            catch (BreakSignal&) { break; }
         }
     }
     void for_stmt() {
@@ -436,8 +460,10 @@ struct Interpreter {
 
         auto run_body_with = [&](Value v) {
             maybe_yield();
-            pos = body_start; decl_var(var_name, std::move(v));
-            try { run_block(); } catch (BreakSignal&) { throw; }
+            pos = body_start;
+            env->vars[var_name] = std::move(v);
+            try { run_block(); }
+            catch (ContinueSignal&) { return; }
         };
 
         if (std::holds_alternative<NumVal>(collection)) {
@@ -473,39 +499,24 @@ struct Interpreter {
         std::string out;
         while (!check(END)   && !check(RBRACE) && !check(VAR)   && !check(PROC)
             && !check(WHILE) && !check(FOR)    && !check(IF)    && !check(ELSE)
-            && !check(BREAK) && !check(PRINT)  && !check(RETURN)
+            && !check(BREAK) && !check(CONTINUE) && !check(PRINT)  && !check(RETURN)
             && !(check(IDENT) && T[pos+1].type == ASSIGN)
             && T[pos].line == pl)
             out += to_str(expr());
         std::cout << out << "\n";
     }
 
-    Value call_user(const std::string& name, std::vector<Value> args) {
-        auto& p = procs.at(name);
-        if (args.size() != p.params.size())
-            throw make_err("arity mismatch calling '" + name + "': expected "
-                           + std::to_string(p.params.size()) + " args");
-        call_stack.push_back(name);
-        Interpreter sub{p.body, 0, globals, {}, procs, builtins, load_fn, yield_fn, true, p.def_file, call_stack};
-        for (size_t i = 0; i < args.size(); i++) sub.locals[p.params[i]] = args[i];
-        Value result{NumVal{0.0}};
-        try {
-            sub.run_block();
-        } catch (ReturnSignal& r) {
-            result = r.val;
-        } catch (...) {
-            call_stack.pop_back();
-            throw;
-        }
-        call_stack.pop_back();
-        return result;
-    }
     Value call_procval(const ProcVal& pv, std::vector<Value> args, const std::string& label = "<proc>") {
         if (args.size() != pv->params.size())
             throw make_err("arity mismatch: expected " + std::to_string(pv->params.size()) + " args");
+
+        if (call_stack.size() >= MAX_CALL_DEPTH)
+            throw make_err("maximum recursion depth exceeded");
+
         call_stack.push_back(label);
-        Interpreter sub{pv->body, 0, globals, {}, procs, builtins, load_fn, yield_fn, true, pv->def_file, call_stack};
-        for (size_t i = 0; i < args.size(); i++) sub.locals[pv->params[i]] = args[i];
+        EnvPtr call_env = std::make_shared<Env>(pv->closure ? pv->closure : env);
+        for (size_t i = 0; i < args.size(); i++) call_env->vars[pv->params[i]] = args[i];
+        Interpreter sub{pv->body, 0, call_env, builtins, load_fn, yield_fn, pv->def_file, call_stack};
         Value result{NumVal{0.0}};
         try {
             sub.run_block();
@@ -519,7 +530,6 @@ struct Interpreter {
         return result;
     }
     Value call_builtin(const std::string& nm, std::vector<Value>& a) {
-        // user-registered functions take priority
         auto it = builtins.find(nm);
         if (it != builtins.end()) return it->second(a, *this);
 
@@ -734,17 +744,21 @@ struct Interpreter {
             chk(1); chk_arr(0, "shuffle");
             auto r = std::make_shared<Array>(Array{ap(0)->elems});
             auto& el = r->elems;
-            for (size_t i = el.size()-1; i > 0; i--) {
-                size_t j = (size_t)std::rand() % (i + 1);
-                std::swap(el[i], el[j]);
+            if (!el.empty()) {
+                for (size_t i = el.size()-1; i > 0; i--) {
+                    size_t j = (size_t)std::rand() % (i + 1);
+                    std::swap(el[i], el[j]);
+                }
             }
             return r;
         }
         if (nm=="keys") {
             chk(0);
             auto r = std::make_shared<Array>();
-            for (auto& [k, _] : globals) r->elems.push_back(k);
-            for (auto& [k, _] : procs) r->elems.push_back(k);
+            std::unordered_map<std::string, bool> seen;
+            for (EnvPtr e = env; e; e = e->parent) {
+                for (auto& [k, _] : e->vars) if (!seen[k]) { seen[k] = true; r->elems.push_back(k); }
+            }
             return r;
         }
 
@@ -790,19 +804,19 @@ struct Interpreter {
         }
         if (nm=="exec") {
             chk(1);
-            std::cout.flush();   // flush output before child process writes
+            std::cout.flush();
             return NumVal{(double)std::system(sv(0).c_str())};
         }
         if (nm=="apply") {
-            // apply(f, args_array) — f can be a proc value or a proc/builtin name string
             if (a.size() != 2) throw make_err("apply: needs 2 args (proc or name, array)");
             chk_arr(1, "apply");
             std::vector<Value> args = ap(1)->elems;
             if (std::holds_alternative<ProcVal>(a[0]))
                 return call_procval(std::get<ProcVal>(a[0]), args);
             std::string proc_name = sv(0);
-            auto pit = procs.find(proc_name);
-            if (pit != procs.end()) return call_user(proc_name, args);
+            Value* vp = get_var_ptr(proc_name);
+            if (vp && std::holds_alternative<ProcVal>(*vp))
+                return call_procval(std::get<ProcVal>(*vp), args, proc_name);
             return call_builtin(proc_name, args);
         }
         if (nm=="exit")  { chk(1); std::exit((int)d(0)); }
@@ -821,7 +835,7 @@ struct Interpreter {
     Value expr() {
         maybe_yield();
         return or_expr();
-    }    
+    }
     Value or_expr()  {
         Value l = and_expr();
         while (check(OR)) { consume(); Value r = and_expr(); l = NumVal{(to_bool(l)||to_bool(r)) ? 1.0 : 0.0}; }
@@ -840,21 +854,24 @@ struct Interpreter {
         Value l = add();
         if (check(LT)||check(GT)||check(LE)||check(GE)||check(EQ)||check(NEQ)) {
             TK op = consume().type; Value r = add();
-            // string equality
             if (std::holds_alternative<std::string>(l) || std::holds_alternative<std::string>(r)) {
                 bool eq = values_equal(l, r);
                 if (op==EQ)  return NumVal{eq ? 1.0 : 0.0};
                 if (op==NEQ) return NumVal{!eq ? 1.0 : 0.0};
                 throw make_err("strings only support == and !=");
             }
-            // array identity comparison
             if (std::holds_alternative<ArrayPtr>(l) || std::holds_alternative<ArrayPtr>(r)) {
                 bool eq = values_equal(l, r);
                 if (op==EQ)  return NumVal{eq ? 1.0 : 0.0};
                 if (op==NEQ) return NumVal{!eq ? 1.0 : 0.0};
                 throw make_err("arrays only support == and !=");
             }
-            // numeric: element-wise, returns NumVal mask
+            if (std::holds_alternative<ProcVal>(l) || std::holds_alternative<ProcVal>(r)) {
+                bool eq = values_equal(l, r);
+                if (op==EQ)  return NumVal{eq ? 1.0 : 0.0};
+                if (op==NEQ) return NumVal{!eq ? 1.0 : 0.0};
+                throw make_err("procs only support == and !=");
+            }
             return nv_cmp(std::get<NumVal>(l), std::get<NumVal>(r), op);
         }
         return l;
@@ -864,11 +881,9 @@ struct Interpreter {
         while (check(PLUS) || check(MINUS)) {
             bool plus = consume().type == PLUS;
             Value r = mul();
-            // ---- string concatenation ----
             if (plus &&
                 (std::holds_alternative<std::string>(l) ||
                 std::holds_alternative<std::string>(r))) {
-                // forbid matrix in string concatenation
                 if (std::holds_alternative<ArrayPtr>(l) ||
                     std::holds_alternative<ArrayPtr>(r)) {
                     throw make_err("operator '+': cannot concatenate matrices to string");
@@ -878,14 +893,12 @@ struct Interpreter {
                 l = ls + rs;
                 continue;
             }
-            // ---- numeric/vector arithmetic ----
             if (std::holds_alternative<NumVal>(l) &&
                 std::holds_alternative<NumVal>(r)) {
                 if (plus) l = nv_binop(std::get<NumVal>(l), std::get<NumVal>(r), '+');
                 else      l = nv_binop(std::get<NumVal>(l), std::get<NumVal>(r), '-');
                 continue;
             }
-            // ---- matrix misuse ----
             if (std::holds_alternative<ArrayPtr>(l) ||
                 std::holds_alternative<ArrayPtr>(r)) {
                 throw make_err(
@@ -894,7 +907,6 @@ struct Interpreter {
                     : "operator '-': not defined for matrices; use matsub(A, B) or matshift(A, -s)"
                 );
             }
-            // ---- generic error ----
             throw make_err(
                 plus
                 ? "operator '+': invalid operand types"
@@ -958,7 +970,6 @@ struct Interpreter {
                     throw make_err("subscript on non-indexable value");
                 }
             } else {
-                // LPAREN after a ProcVal: call it
                 consume();
                 std::vector<Value> args;
                 while (!check(RPAREN)) { args.push_back(expr()); if (!check(RPAREN)) expect(COMMA); }
@@ -973,7 +984,6 @@ struct Interpreter {
         if (check(STR))     return consume().val;
         if (check(LPAREN))  { consume(); Value v=expr(); expect(RPAREN); return v; }
 
-        // anonymous proc literal:  proc (params) { body }
         if (check(PROC)) {
             consume();
             std::vector<std::string> params;
@@ -991,10 +1001,9 @@ struct Interpreter {
                 body.push_back(consume());
             }
             body.push_back({END, ""});
-            return std::make_shared<Proc>(Proc{std::move(params), std::move(body), filename});
+            return std::make_shared<Proc>(Proc{std::move(params), std::move(body), filename, env});
         }
 
-        // array literal: [expr, expr, ...]
         if (check(LBRACKET)) {
             consume();
             auto arr = std::make_shared<Array>();
@@ -1016,23 +1025,13 @@ struct Interpreter {
                     if (!check(RPAREN)) expect(COMMA);
                 }
                 expect(RPAREN);
-                // 1. Named proc
-                auto pit = procs.find(n);
-                if (pit != procs.end()) return call_user(n, args);
-                // 2. Variable holding a ProcVal
                 Value* vp = get_var_ptr(n);
                 if (vp && std::holds_alternative<ProcVal>(*vp))
                     return call_procval(std::get<ProcVal>(*vp), args, n);
-                // 3. Builtin
                 return call_builtin(n, args);
             }
-            // Variable lookup: locals/globals first, then named procs.
-            // Named procs are transparently first-class: passing `f` without ()
-            // returns a ProcVal so it can be stored, passed, or called later.
             Value* vp = get_var_ptr(n);
             if (vp) return *vp;
-            auto pit = procs.find(n);
-            if (pit != procs.end()) return std::make_shared<Proc>(pit->second);
             throw make_err("undefined '" + n + "'");
         }
 
@@ -1048,23 +1047,19 @@ struct Environment {
     }
     void set_yield(YieldFn fn) {
         yield_fn = std::move(fn);
-    }    
+    }
     void exec(const std::string& src, const std::string& filename = "<stdin>") {
         auto toks = lex(src, filename);
-        // Interpreter interp{std::move(toks), 0, globals, {}, procs, builtins,
-        //                    {}, false, filename, call_stack};
-        Interpreter interp{std::move(toks), 0, globals, {}, procs, builtins,
-                           {}, yield_fn, false, filename, call_stack};                           
+        Interpreter interp{std::move(toks), 0, global, builtins, {}, yield_fn, filename, call_stack};
         interp.load_fn = [this](const std::string& s, const std::string& f){ this->exec(s, f); };
         interp.run();
     }
 
-    std::map<std::string, Value>   globals;
-    std::map<std::string, Proc>    procs;
+    EnvPtr global = std::make_shared<Env>();
     std::map<std::string, Builtin> builtins;
-    std::vector<std::string>       call_stack;    
+    std::vector<std::string>       call_stack;
     std::vector<std::string>       paths;
-    YieldFn                         yield_fn;    
+    YieldFn                        yield_fn;
 };
 std::string format_error(const Error& e) {
     std::string msg = e.file + ":" + std::to_string(e.line) + ": " + e.msg;

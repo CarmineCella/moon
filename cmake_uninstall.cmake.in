@@ -2,10 +2,9 @@ message(STATUS "Starting Musil uninstall...")
 
 set(PREFIX "@CMAKE_INSTALL_PREFIX@")
 set(IS_APPLE "@APPLE@")
-set(MANIFEST "@CMAKE_BINARY_DIR@/install_manifest.txt")
 
 # ------------------------------------------------------------------------------
-# 2. Remove ~/.musil
+# Remove ~/.musil
 # ------------------------------------------------------------------------------
 
 if(DEFINED ENV{HOME})
@@ -16,10 +15,34 @@ if(DEFINED ENV{HOME})
     else()
         message(STATUS "~/.musil directory not present")
     endif()
+
+    # --------------------------------------------------------------------------
+    # Remove ~/.musilrc
+    # --------------------------------------------------------------------------
+
+    set(MUSIL_RC "$ENV{HOME}/.musilrc")
+    if(EXISTS "${MUSIL_RC}")
+        message(STATUS "Removing file: ${MUSIL_RC}")
+        file(REMOVE "${MUSIL_RC}")
+    else()
+        message(STATUS "~/.musilrc not present")
+    endif()
 endif()
 
 # ------------------------------------------------------------------------------
-# 3. Remove Musil IDE.app from /Applications on macOS
+# Remove CLI binary from install prefix
+# ------------------------------------------------------------------------------
+
+set(MUSIL_BIN "${PREFIX}/bin/musil")
+if(EXISTS "${MUSIL_BIN}")
+    message(STATUS "Removing CLI binary: ${MUSIL_BIN}")
+    file(REMOVE "${MUSIL_BIN}")
+else()
+    message(STATUS "CLI binary not found: ${MUSIL_BIN}")
+endif()
+
+# ------------------------------------------------------------------------------
+# Remove app bundle from /Applications on macOS
 # ------------------------------------------------------------------------------
 
 if(IS_APPLE)
@@ -30,20 +53,6 @@ if(IS_APPLE)
     else()
         message(STATUS "Musil IDE.app not found in /Applications")
     endif()
-endif()
-
-# ------------------------------------------------------------------------------
-# 4. Optional cleanup for CLI leftovers
-# ------------------------------------------------------------------------------
-
-if(EXISTS "${PREFIX}/musil")
-    message(STATUS "Removing: ${PREFIX}/musil")
-    file(REMOVE_RECURSE "${PREFIX}/musil")
-endif()
-
-if(EXISTS "${PREFIX}/bin/musil")
-    message(STATUS "Removing CLI binary: ${PREFIX}/bin/musil")
-    file(REMOVE "${PREFIX}/bin/musil")
 endif()
 
 message(STATUS "Musil uninstall completed.")

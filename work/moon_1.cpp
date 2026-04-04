@@ -232,7 +232,6 @@ struct Interp {
         }
         return l;
     }
-
     Value atom() {
         if (check(NUM))    return std::stod(consume().val);
         if (check(STR))    return consume().val;

@@ -692,7 +692,9 @@ void menu_syntaxhighlight_callback(Fl_Widget* w, void*) {
 // ── Variable browser update ───────────────────────────────────────────────────
 //
 // Iterates the live Environment to populate the browser panel.
-// Categorises entries as: Builtins (dark blue), Procs (blue), Globals (green).
+// With closure-based core, named procs are stored as ProcVal entries inside
+// the root environment rather than in separate .procs / .globals maps.
+// Categorises entries as: Builtins (dark blue), Procs (blue), Variables (green).
 
 void update_keywords_from_env_and_browser() {
     g_env_symbols.clear();
@@ -700,18 +702,19 @@ void update_keywords_from_env_and_browser() {
 
     if (!app_var_browser) return;
 
-    // Collect and sort each category
     std::vector<std::string> builtins_list, procs_list, globals_list;
 
-    for (const auto& kv : musil_env.builtins) {
+    for (const auto& kv : musil_env.builtins)
         builtins_list.push_back(kv.first);
-        std::cout << kv.first << std::endl;
+
+    if (musil_env.global) {
+        for (const auto& kv : musil_env.global->vars) {
+            if (std::holds_alternative<ProcVal>(kv.second))
+                procs_list.push_back(kv.first);
+            else
+                globals_list.push_back(kv.first);
+        }
     }
-    for (const auto& kv : musil_env.procs)
-        procs_list.push_back(kv.first);
-    
-        for (const auto& kv : musil_env.globals)
-        globals_list.push_back(kv.first);
 
     std::sort(builtins_list.begin(), builtins_list.end());
     std::sort(procs_list.begin(),    procs_list.end());
@@ -724,14 +727,14 @@ void update_keywords_from_env_and_browser() {
         std::ostringstream oss;
         oss << "@B" << (int)FL_DARK_BLUE << "@C" << (int)FL_WHITE << " " << title;
         app_var_browser->add(oss.str().c_str());
-        g_browser_symbols.push_back("");  // header → non-clickable
+        g_browser_symbols.push_back("");
     };
 
     auto add_header = [&](const char* title) {
         std::ostringstream oss;
         oss << "@B" << (int)FL_GRAY << "@C" << (int)FL_BLACK << " " << title;
         app_var_browser->add(oss.str().c_str());
-        g_browser_symbols.push_back("");  // header → non-clickable
+        g_browser_symbols.push_back("");
     };
 
     auto add_entry = [&](const std::string& name, Fl_Color color) {
@@ -750,12 +753,11 @@ void update_keywords_from_env_and_browser() {
     }
     if (!procs_list.empty()) {
         add_header("Procs");
-        for (const auto& n : procs_list)  add_entry(n, FL_BLUE);
+        for (const auto& n : procs_list) add_entry(n, FL_BLUE);
     }
 
-    if (!builtins_list.empty()) { // not displayed in the browser but still added to env symbols for autocomplete
-        for (const auto& n : builtins_list) g_env_symbols.push_back(n);
-    }
+    for (const auto& n : builtins_list)
+        g_env_symbols.push_back(n);
 
     app_var_browser->redraw();
 }
