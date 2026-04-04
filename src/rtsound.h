@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <atomic>
 #include <chrono>
+#include <cmath>
 #include <cstdint>
 #include <cstring>
 #include <iostream>
@@ -122,9 +123,11 @@ static inline PlaybackBuffer value_to_playback_buffer(const Value& v,
 #ifdef BUILD_MUSIL_RTSOUND
 
 struct Voice {
+    uint64_t id = 0;
     std::shared_ptr<PlaybackBuffer> buffer;
     std::atomic<uint64_t> cursor_frames {0};
     std::atomic<bool> finished {false};
+    std::atomic<bool> paused {false};
 };
 
 inline std::mutex g_mutex;
@@ -134,6 +137,7 @@ inline std::vector<std::shared_ptr<Voice>> g_voices;
 inline std::atomic<bool> g_running {false};
 inline std::atomic<bool> g_stop_requested {false};
 inline std::atomic<bool> g_device_initialized {false};
+inline std::atomic<uint64_t> g_next_voice_id {0};
 
 inline uint32_t g_sample_rate = 0;
 inline uint32_t g_channels    = 0;
@@ -165,6 +169,45 @@ static inline void clear_all_voices_locked() {
     g_voices.clear();
 }
 
+static inline uint64_t parse_voice_id_arg(const Value& v,
+                                          Interpreter& interp,
+                                          const std::string& fn)
+{
+    double x = scalar(v, fn);
+
+    if (x < 0.0) {
+        throw Error{interp.filename, interp.cur_line(),
+                    fn + ": voice id must be >= 0", {}};
+    }
+
+    double xi = std::floor(x);
+    if (x != xi) {
+        throw Error{interp.filename, interp.cur_line(),
+                    fn + ": voice id must be an integer", {}};
+    }
+
+    return static_cast<uint64_t>(xi);
+}
+
+static inline std::shared_ptr<Voice> find_voice_by_id_locked(uint64_t voice_id) {
+    for (auto& v : g_voices) {
+        if (v && v->id == voice_id) {
+            return v;
+        }
+    }
+    return nullptr;
+}
+
+static inline std::shared_ptr<Voice> make_voice(const std::shared_ptr<PlaybackBuffer>& buffer) {
+    auto voice = std::make_shared<Voice>();
+    voice->id = g_next_voice_id.fetch_add(1, std::memory_order_relaxed);
+    voice->buffer = buffer;
+    voice->cursor_frames.store(0, std::memory_order_relaxed);
+    voice->finished.store(false, std::memory_order_relaxed);
+    voice->paused.store(false, std::memory_order_relaxed);
+    return voice;
+}
+
 // ── Callback ──────────────────────────────────────────────────────────────
 
 static inline void playback_callback(ma_device* device,
@@ -189,6 +232,10 @@ static inline void playback_callback(ma_device* device,
 
     for (auto& voice : g_voices) {
         if (!voice || !voice->buffer || voice->finished.load(std::memory_order_relaxed)) {
+            continue;
+        }
+
+        if (voice->paused.load(std::memory_order_relaxed)) {
             continue;
         }
 
@@ -317,15 +364,13 @@ static inline Value fn_play_async(std::vector<Value>& args, Interpreter& interp)
         g_stop_requested.store(false, std::memory_order_relaxed);
         g_voices.clear();
 
-        auto voice = std::make_shared<Voice>();
-        voice->buffer = buffer;
-        voice->cursor_frames.store(0, std::memory_order_relaxed);
-        voice->finished.store(false, std::memory_order_relaxed);
+        auto voice = make_voice(buffer);
+        const uint64_t voice_id = voice->id;
         g_voices.push_back(voice);
 
         g_running.store(true, std::memory_order_relaxed);
         g_thread = std::thread(thread_main, g_sample_rate, g_channels);
-        return NumVal{1.0};
+        return NumVal{static_cast<double>(voice_id)};
     }
 
     if (buffer->sample_rate != g_sample_rate) {
@@ -338,13 +383,11 @@ static inline Value fn_play_async(std::vector<Value>& args, Interpreter& interp)
                     "play_async: channel count must match currently running DAC", {}};
     }
 
-    auto voice = std::make_shared<Voice>();
-    voice->buffer = buffer;
-    voice->cursor_frames.store(0, std::memory_order_relaxed);
-    voice->finished.store(false, std::memory_order_relaxed);
+    auto voice = make_voice(buffer);
+    const uint64_t voice_id = voice->id;
     g_voices.push_back(voice);
 
-    return NumVal{1.0};
+    return NumVal{static_cast<double>(voice_id)};
 }
 
 static inline Value fn_play(std::vector<Value>& args, Interpreter& interp) {
@@ -358,19 +401,108 @@ static inline Value fn_play(std::vector<Value>& args, Interpreter& interp) {
 }
 
 static inline Value fn_dacstop(std::vector<Value>& args, Interpreter& interp) {
-    if (!args.empty()) {
+    if (args.size() > 1) {
         throw Error{interp.filename, interp.cur_line(),
-                    "dacstop: expected 0 arguments", {}};
+                    "dacstop: expected 0 or 1 arguments", {}};
     }
+
+    if (args.empty()) {
+        {
+            std::lock_guard<std::mutex> lock(g_mutex);
+            g_stop_requested.store(true, std::memory_order_relaxed);
+            clear_all_voices_locked();
+        }
+
+        join_thread_if_needed_locked();
+        g_running.store(false, std::memory_order_relaxed);
+        return NumVal{1.0};
+    }
+
+    const uint64_t voice_id = parse_voice_id_arg(args[0], interp, "dacstop");
 
     {
         std::lock_guard<std::mutex> lock(g_mutex);
-        g_stop_requested.store(true, std::memory_order_relaxed);
-        clear_all_voices_locked();
+
+        cleanup_finished_voices_locked();
+
+        auto voice = find_voice_by_id_locked(voice_id);
+        if (!voice) {
+            throw Error{interp.filename, interp.cur_line(),
+                        "dacstop: invalid voice id", {}};
+        }
+
+        voice->finished.store(true, std::memory_order_relaxed);
+        cleanup_finished_voices_locked();
     }
 
-    join_thread_if_needed_locked();
-    g_running.store(false, std::memory_order_relaxed);
+    return NumVal{1.0};
+}
+
+static inline Value fn_dacpause(std::vector<Value>& args, Interpreter& interp) {
+    if (args.size() > 1) {
+        throw Error{interp.filename, interp.cur_line(),
+                    "dacpause: expected 0 or 1 arguments", {}};
+    }
+
+    std::lock_guard<std::mutex> lock(g_mutex);
+
+    cleanup_finished_voices_locked();
+
+    if (args.empty()) {
+        for (auto& v : g_voices) {
+            if (v && !v->finished.load(std::memory_order_relaxed)) {
+                v->paused.store(true, std::memory_order_relaxed);
+            }
+        }
+        return NumVal{1.0};
+    }
+
+    const uint64_t voice_id = parse_voice_id_arg(args[0], interp, "dacpause");
+
+    auto voice = find_voice_by_id_locked(voice_id);
+    if (!voice) {
+        throw Error{interp.filename, interp.cur_line(),
+                    "dacpause: invalid voice id", {}};
+    }
+
+    if (!voice->finished.load(std::memory_order_relaxed)) {
+        voice->paused.store(true, std::memory_order_relaxed);
+    }
+
+    return NumVal{1.0};
+}
+
+static inline Value fn_dacresume(std::vector<Value>& args, Interpreter& interp) {
+    if (args.size() > 1) {
+        throw Error{interp.filename, interp.cur_line(),
+                    "dacresume: expected 0 or 1 arguments", {}};
+    }
+
+    std::lock_guard<std::mutex> lock(g_mutex);
+
+    cleanup_finished_voices_locked();
+
+    if (args.empty()) {
+        for (auto& v : g_voices) {
+            if (v && !v->finished.load(std::memory_order_relaxed)) {
+                v->paused.store(false, std::memory_order_relaxed);
+            }
+        }
+        return NumVal{1.0};
+    }
+
+    const uint64_t voice_id = parse_voice_id_arg(args[0], interp, "dacresume");
+
+    auto voice = find_voice_by_id_locked(voice_id);
+    if (!voice) {
+        throw Error{interp.filename, interp.cur_line(),
+                    "dacresume: invalid voice id", {}};
+    }
+
+    if (!voice->finished.load(std::memory_order_relaxed)) {
+        voice->paused.store(false, std::memory_order_relaxed);
+    }
+
     return NumVal{1.0};
 }
 
@@ -458,11 +590,13 @@ static inline Value fn_dacinfo(std::vector<Value>& args, Interpreter& interp) {
         const uint64_t remain = (cursor < frames) ? (frames - cursor) : 0;
 
         ss << "voice[" << i << "]: "
-           << "frames=" << frames
+           << "id=" << v->id
+           << " frames=" << frames
            << " cursor=" << cursor
            << " remaining=" << remain
            << " channels=" << v->buffer->channels
            << " sample_rate=" << v->buffer->sample_rate
+           << " paused=" << (v->paused.load(std::memory_order_relaxed) ? "yes" : "no")
            << " finished=" << (v->finished.load(std::memory_order_relaxed) ? "yes" : "no")
            << "\n";
     }
@@ -491,11 +625,29 @@ static inline Value fn_play_async(std::vector<Value>& args, Interpreter& interp)
 }
 
 static inline Value fn_dacstop(std::vector<Value>& args, Interpreter& interp) {
-    if (!args.empty()) {
+    if (args.size() > 1) {
         throw Error{interp.filename, interp.cur_line(),
-                    "dacstop: expected 0 arguments", {}};
+                    "dacstop: expected 0 or 1 arguments", {}};
     }
     std::cout << "dacstop: realtime sound system has not been enabled" << std::endl;
+    return NumVal{0.0};
+}
+
+static inline Value fn_dacpause(std::vector<Value>& args, Interpreter& interp) {
+    if (args.size() > 1) {
+        throw Error{interp.filename, interp.cur_line(),
+                    "dacpause: expected 0 or 1 arguments", {}};
+    }
+    std::cout << "dacpause: realtime sound system has not been enabled" << std::endl;
+    return NumVal{0.0};
+}
+
+static inline Value fn_dacresume(std::vector<Value>& args, Interpreter& interp) {
+    if (args.size() > 1) {
+        throw Error{interp.filename, interp.cur_line(),
+                    "dacresume: expected 0 or 1 arguments", {}};
+    }
+    std::cout << "dacresume: realtime sound system has not been enabled" << std::endl;
     return NumVal{0.0};
 }
 
@@ -523,6 +675,8 @@ inline void add_rtsound(Environment& env) {
     env.register_builtin("play",       fn_play);
     env.register_builtin("play_async", fn_play_async);
     env.register_builtin("dacstop",    fn_dacstop);
+    env.register_builtin("dacpause",   fn_dacpause);
+    env.register_builtin("dacresume",  fn_dacresume);
     env.register_builtin("dacrunning", fn_dacrunning);
     env.register_builtin("dacinfo",    fn_dacinfo);
 }
