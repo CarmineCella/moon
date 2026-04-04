@@ -9,7 +9,8 @@ v0.6
 - music library: orchestrate, mp, soundtypes, granular orchestrate, symbolic composition system (notes, midi in and out, musicxml out, algorithmic gen)
 - system interaction: exists(path), isfile(path), isdir(path), mkdir(path), remove(path), rename(a, b), listdir(path), or exec with return value
 - regex
-- IDE: shortcut for commenting/uncommenting
+- IDE: shortcut for commenting/uncommenting, BPF editor
+- live audio support: initially only "play" (miniaudio)
 
 v0.51
 - add paths for IDE or find solution  (path resolver) *

@@ -560,7 +560,7 @@ static void create_plot_window_cb(void* userdata) {
     pw->win->resizable(pw->canvas);
     pw->win->callback(plot_close_cb, pw);
     pw->win->end();
-    pw->win->set_non_modal();
+    //pw->win->set_non_modal();
     pw->win->show();
 }
 
