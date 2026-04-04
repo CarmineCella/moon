@@ -155,6 +155,7 @@ void menu_find_dialog_callback(Fl_Widget*, void*);
 void menu_find_next_callback(Fl_Widget*, void*);
 void menu_replace_one_callback(Fl_Widget*, void*);
 void menu_replace_all_callback(Fl_Widget*, void*);
+void menu_comment_toggle_callback(Fl_Widget*, void*);
 
 void menu_run_script_callback(Fl_Widget*, void*);
 void menu_run_selection_callback(Fl_Widget*, void*);
@@ -180,6 +181,7 @@ void create_find_dialog();
 int  editor_find_next(bool from_start);
 void editor_replace_one();
 void editor_replace_all();
+void editor_toggle_comment_selection();
 
 void build_paths_dialog();
 void build_app_window();
@@ -1063,6 +1065,11 @@ public:
             update_paren_match();
             redraw();
         }
+        if (Fl::event_key() == '/' && (Fl::event_state() & FL_COMMAND)) {
+            editor_toggle_comment_selection();
+            return 1;
+        }
+
         return ret;
     }
 };
@@ -1664,6 +1671,79 @@ void editor_replace_all() {
         pos += (int)strlen(repl ? repl : "");
     }
 }
+void editor_toggle_comment_selection() {
+    if (!app_text_buffer || !app_editor) return;
+
+    int sel_start = 0, sel_end = 0;
+    bool has_sel = app_text_buffer->selection_position(&sel_start, &sel_end) != 0;
+
+    int start_pos, end_pos;
+    if (has_sel && sel_start != sel_end) {
+        start_pos = app_text_buffer->line_start(sel_start);
+        end_pos   = app_text_buffer->line_end(sel_end);
+    } else {
+        int pos = app_editor->insert_position();
+        start_pos = app_text_buffer->line_start(pos);
+        end_pos   = app_text_buffer->line_end(pos);
+    }
+
+    char* block = app_text_buffer->text_range(start_pos, end_pos);
+    if (!block) return;
+
+    std::string text(block);
+    free(block);
+
+    std::vector<std::string> lines;
+    std::stringstream ss(text);
+    std::string line;
+    while (std::getline(ss, line)) {
+        lines.push_back(line);
+    }
+
+    if (!text.empty() && text.back() == '\n') {
+        lines.push_back("");
+    }
+
+    bool all_commented = true;
+    for (const auto& l : lines) {
+        std::size_t i = 0;
+        while (i < l.size() && (l[i] == ' ' || l[i] == '\t')) ++i;
+        if (i >= l.size()) continue; // empty line: ignore
+        if (l[i] != '#') {
+            all_commented = false;
+            break;
+        }
+    }
+
+    std::string out;
+    for (std::size_t k = 0; k < lines.size(); ++k) {
+        std::string l = lines[k];
+        std::size_t i = 0;
+        while (i < l.size() && (l[i] == ' ' || l[i] == '\t')) ++i;
+
+        if (all_commented) {
+            if (i < l.size() && l[i] == '#') {
+                l.erase(i, 1);
+                if (i < l.size() && l[i] == ' ') l.erase(i, 1);
+            }
+        } else {
+            if (i < l.size()) l.insert(i, "# ");
+        }
+
+        out += l;
+        if (k + 1 < lines.size()) out += "\n";
+    }
+
+    app_text_buffer->replace(start_pos, end_pos, out.c_str());
+    app_text_buffer->select(start_pos, start_pos + (int)out.size());
+    app_editor->insert_position(start_pos);
+    app_editor->show_insert_position();
+    set_changed(true);
+}
+
+void menu_comment_toggle_callback(Fl_Widget*, void*) {
+    editor_toggle_comment_selection();
+}
 
 void menu_find_dialog_callback(Fl_Widget*, void*) {
     create_find_dialog();
@@ -1827,7 +1907,8 @@ void build_app_menu_bar() {
     app_menu_bar->add("Edit/Find...",     FL_COMMAND+'f', menu_find_dialog_callback);
     app_menu_bar->add("Edit/Find next",   FL_COMMAND+'g', menu_find_next_callback);
     app_menu_bar->add("Edit/Replace...",  FL_COMMAND+'h', menu_find_dialog_callback, nullptr, FL_MENU_DIVIDER);
-    app_menu_bar->add("Edit/Go to Line...", FL_COMMAND+'l', menu_goto_line_callback);
+    app_menu_bar->add("Edit/Go to Line...", FL_COMMAND+'l', menu_goto_line_callback, nullptr, FL_MENU_DIVIDER);
+    app_menu_bar->add("Edit/Toggle comment", FL_COMMAND + '/', menu_comment_toggle_callback);
 
     // Evaluate
     app_menu_bar->add("Evaluate/Run script",          FL_COMMAND+'r', menu_run_script_callback);
