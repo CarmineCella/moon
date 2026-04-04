@@ -4,7 +4,7 @@ load ("stdlib.mu")
 load ("signals.mu")
 
 # play a file sync
-var s = readwav ("../../../data/Concertgebouw-s.wav")[1]
+var s = readwav ("../../data/Concertgebouw-s.wav")[1]
 play (s)
 play (s, 22050) # change SR
 play ([s[0], s[1], s[0], s[1], s[0], s[1], s[0], s[1]]) # fake multi-channels
@@ -13,22 +13,24 @@ play ([s[0], s[1], s[0], s[1], s[0], s[1], s[0], s[1]]) # fake multi-channels
 var tab1 = gen(4096, 1)
 play_async (osc (44100, linspace (220, 440, 441000), tab1)  * .2)
 print "sound will play for 10 seconds, we will stop after 5..."
-sleep (5000)
 print dacinfo ()
+sleep (5000)
 dacstop ()
-print "done playback"
 
 
+# mix some files
 proc playfile (f, async) {
 	var s = readwav (f)[1]
 	if (async == 1) { play_async (s) }
 	else { play (s) }
 }
 
-playfile ("../../../data/Vox.wav", 1)
+playfile ("../../data/Vox.wav", 1)
 sleep (1000)
-playfile ("../../../data/Beethoven_Symph7.wav", 1)
+playfile ("../../data/Beethoven_Symph7.wav", 1)
 sleep (1000)
-playfile ("../../../data/cage.wav", 1)
+playfile ("../../data/cage.wav", 1)
 sleep (1000)
-playfile ("../../../data/Gambale_cut.wav", 1)
+playfile ("../../data/Gambale_cut.wav", 1)
+
+print "done playback"

@@ -10,7 +10,7 @@ v0.6
 - system interaction: exists(path), isfile(path), isdir(path), mkdir(path), remove(path), rename(a, b), listdir(path), or exec with return value
 - regex
 - IDE: shortcut for commenting/uncommenting, BPF editor
-- live audio support: initially only "play" (miniaudio)
+- live audio support: initially only "play"*, then full sound server
 
 v0.51
 - add paths for IDE or find solution  (path resolver) *
